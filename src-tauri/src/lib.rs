@@ -30,6 +30,12 @@ pub fn run() {
       commit_changes,
       get_recent_commits,
       init_git_repo,
+      init_git_repo_enhanced,
+      get_git_config,
+      set_git_config,
+      is_git_repository,
+      git_push,
+      git_pull,
       list_directory,
       create_file,
       create_directory,
@@ -94,6 +100,59 @@ async fn init_git_repo(project_path: String) -> Result<(), String> {
   match git::init_git_repo(Path::new(&project_path)) {
     Ok(_) => Ok(()),
     Err(e) => Err(format!("Failed to initialize git repository: {}", e)),
+  }
+}
+
+#[tauri::command]
+async fn init_git_repo_enhanced(project_path: String) -> Result<git::GitInitResult, String> {
+  match git::init_git_repo_enhanced(Path::new(&project_path)) {
+    Ok(result) => Ok(result),
+    Err(e) => Err(format!("Failed to initialize git repository: {}", e)),
+  }
+}
+
+#[tauri::command]
+async fn get_git_config(project_path: String) -> Result<git::GitConfig, String> {
+  match git::get_git_config(Path::new(&project_path)) {
+    Ok(config) => Ok(config),
+    Err(e) => Err(format!("Failed to get git config: {}", e)),
+  }
+}
+
+#[tauri::command]
+async fn set_git_config(project_path: String, name: String, email: String) -> Result<(), String> {
+  match git::set_git_config(Path::new(&project_path), &name, &email) {
+    Ok(_) => Ok(()),
+    Err(e) => Err(format!("Failed to set git config: {}", e)),
+  }
+}
+
+#[tauri::command]
+async fn is_git_repository(project_path: String) -> Result<bool, String> {
+  Ok(git::is_git_repository(Path::new(&project_path)))
+}
+
+#[tauri::command]
+async fn git_push(project_path: String, remote_name: Option<String>, branch_name: Option<String>) -> Result<(), String> {
+  let remote = remote_name.unwrap_or_else(|| "origin".to_string());
+  let branch = branch_name.unwrap_or_else(|| "main".to_string());
+  
+  let git_manager = GitManager::new(Path::new(&project_path));
+  match git_manager.push(&remote, &branch) {
+    Ok(_) => Ok(()),
+    Err(e) => Err(format!("Failed to push: {}", e)),
+  }
+}
+
+#[tauri::command]
+async fn git_pull(project_path: String, remote_name: Option<String>, branch_name: Option<String>) -> Result<(), String> {
+  let remote = remote_name.unwrap_or_else(|| "origin".to_string());
+  let branch = branch_name.unwrap_or_else(|| "main".to_string());
+  
+  let git_manager = GitManager::new(Path::new(&project_path));
+  match git_manager.pull(&remote, &branch) {
+    Ok(_) => Ok(()),
+    Err(e) => Err(format!("Failed to pull: {}", e)),
   }
 }
 

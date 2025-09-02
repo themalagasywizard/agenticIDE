@@ -1,6 +1,7 @@
-use git2::{Repository, Status, StatusOptions};
+use git2::{Repository, Status, StatusOptions, PushOptions, RemoteCallbacks, Cred, ErrorCode, Config};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
+use std::fs;
 use anyhow::{Result, anyhow};
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -20,6 +21,21 @@ pub struct GitCommit {
     pub timestamp: i64,
 }
 
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct GitConfig {
+    pub user_name: Option<String>,
+    pub user_email: Option<String>,
+    pub is_configured: bool,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct GitInitResult {
+    pub success: bool,
+    pub message: String,
+    pub needs_config: bool,
+    pub git_config: Option<GitConfig>,
+}
+
 pub struct GitManager {
     repo: Option<Repository>,
 }
@@ -34,7 +50,7 @@ impl GitManager {
         self.repo.is_some()
     }
 
-    pub fn get_status(&self, repo_path: &Path) -> Result<GitStatus> {
+    pub fn get_status(&self, _repo_path: &Path) -> Result<GitStatus> {
         let repo = if let Some(ref repo) = self.repo {
             repo
         } else {
@@ -47,11 +63,18 @@ impl GitManager {
             });
         };
 
-        // Get current branch
-        let branch = repo.head()?
-            .shorthand()
-            .unwrap_or("HEAD")
-            .to_string();
+        // Get current branch - handle unborn branch (newly initialized repo)
+        let branch = match repo.head() {
+            Ok(head) => head.shorthand().unwrap_or("HEAD").to_string(),
+            Err(e) => {
+                // Check if it's an unborn branch error
+                if e.code() == ErrorCode::UnbornBranch {
+                    "main".to_string() // Default to 'main' for new repositories
+                } else {
+                    return Err(e.into());
+                }
+            }
+        };
 
         // Get status
         let mut opts = StatusOptions::new();
@@ -113,18 +136,38 @@ impl GitManager {
         let tree_id = index.write_tree()?;
         let tree = repo.find_tree(tree_id)?;
 
-        let head = repo.head()?;
-        let parent = repo.find_commit(head.target().unwrap())?;
-
         let sig = repo.signature()?;
-        let commit_id = repo.commit(
-            Some("HEAD"),
-            &sig,
-            &sig,
-            message,
-            &tree,
-            &[&parent],
-        )?;
+        
+        // Handle initial commit (no parent) vs regular commit (with parent)
+        let commit_id = match repo.head() {
+            Ok(head) => {
+                // Regular commit with parent
+                let parent = repo.find_commit(head.target().unwrap())?;
+                repo.commit(
+                    Some("HEAD"),
+                    &sig,
+                    &sig,
+                    message,
+                    &tree,
+                    &[&parent],
+                )?
+            }
+            Err(e) => {
+                // Initial commit (no parent) - check if it's an unborn branch
+                if e.code() == ErrorCode::UnbornBranch {
+                    repo.commit(
+                        Some("HEAD"),
+                        &sig,
+                        &sig,
+                        message,
+                        &tree,
+                        &[], // No parents for initial commit
+                    )?
+                } else {
+                    return Err(e.into());
+                }
+            }
+        };
 
         Ok(commit_id.to_string())
     }
@@ -132,28 +175,284 @@ impl GitManager {
     pub fn get_recent_commits(&self, limit: usize) -> Result<Vec<GitCommit>> {
         let repo = self.repo.as_ref().ok_or_else(|| anyhow!("Not a git repository"))?;
 
-        let mut revwalk = repo.revwalk()?;
-        revwalk.push_head()?;
-
+        // Check if we have any commits at all (handle unborn branch)
         let mut commits = Vec::new();
+        
+        match repo.head() {
+            Ok(_) => {
+                // We have commits, proceed normally
+                let mut revwalk = repo.revwalk()?;
+                revwalk.push_head()?;
 
-        for oid in revwalk.take(limit) {
-            let oid = oid?;
-            let commit = repo.find_commit(oid)?;
+                for oid in revwalk.take(limit) {
+                    let oid = oid?;
+                    let commit = repo.find_commit(oid)?;
 
-            commits.push(GitCommit {
-                hash: oid.to_string(),
-                message: commit.message().unwrap_or("").to_string(),
-                author: commit.author().name().unwrap_or("").to_string(),
-                timestamp: commit.time().seconds(),
-            });
+                    commits.push(GitCommit {
+                        hash: oid.to_string()[..8].to_string(), // Show short hash
+                        message: commit.message().unwrap_or("").to_string(),
+                        author: commit.author().name().unwrap_or("Unknown").to_string(),
+                        timestamp: commit.time().seconds(),
+                    });
+                }
+            }
+            Err(e) => {
+                // No commits yet (unborn branch), return empty list
+                if e.code() == ErrorCode::UnbornBranch {
+                    // Return empty commits list for newly initialized repos
+                } else {
+                    return Err(e.into());
+                }
+            }
         }
 
         Ok(commits)
     }
+
+    pub fn push(&self, remote_name: &str, branch_name: &str) -> Result<()> {
+        let repo = self.repo.as_ref().ok_or_else(|| anyhow!("Not a git repository"))?;
+
+        // Find the remote
+        let mut remote = repo.find_remote(remote_name)?;
+
+        // Set up callbacks for authentication (simplified for now)
+        let mut callbacks = RemoteCallbacks::new();
+        callbacks.credentials(|_url, username_from_url, _allowed_types| {
+            Cred::ssh_key_from_agent(username_from_url.unwrap_or("git"))
+        });
+
+        // Set up push options
+        let mut push_options = PushOptions::new();
+        push_options.remote_callbacks(callbacks);
+
+        // Push the branch
+        let refspec = format!("refs/heads/{}:refs/heads/{}", branch_name, branch_name);
+        remote.push(&[&refspec], Some(&mut push_options))?;
+
+        Ok(())
+    }
+
+    pub fn pull(&self, remote_name: &str, _branch_name: &str) -> Result<()> {
+        let repo = self.repo.as_ref().ok_or_else(|| anyhow!("Not a git repository"))?;
+
+        // Find the remote
+        let mut remote = repo.find_remote(remote_name)?;
+
+        // Set up callbacks for authentication
+        let mut callbacks = RemoteCallbacks::new();
+        callbacks.credentials(|_url, username_from_url, _allowed_types| {
+            Cred::ssh_key_from_agent(username_from_url.unwrap_or("git"))
+        });
+
+        // Fetch from remote
+        let refspecs = remote.fetch_refspecs()?;
+        let refspecs: Vec<&str> = refspecs.iter().filter_map(|s| s).collect();
+        remote.fetch(&refspecs, None, None)?;
+
+        // For now, we'll just fetch. Merging would require more complex logic
+        // to handle conflicts and different merge strategies
+        Ok(())
+    }
 }
 
-pub fn init_git_repo(repo_path: &Path) -> Result<()> {
-    Repository::init(repo_path)?;
+/// Check if a directory is already a Git repository
+pub fn is_git_repository(repo_path: &Path) -> bool {
+    Repository::open(repo_path).is_ok()
+}
+
+/// Get Git configuration for the repository
+pub fn get_git_config(repo_path: &Path) -> Result<GitConfig> {
+    let repo = Repository::open(repo_path)?;
+    let config = repo.config()?;
+    
+    let user_name = config.get_string("user.name").ok();
+    let user_email = config.get_string("user.email").ok();
+    
+    let is_configured = user_name.is_some() && user_email.is_some();
+    
+    Ok(GitConfig {
+        user_name,
+        user_email,
+        is_configured,
+    })
+}
+
+/// Set Git configuration for the repository
+pub fn set_git_config(repo_path: &Path, name: &str, email: &str) -> Result<()> {
+    let repo = Repository::open(repo_path)?;
+    let mut config = repo.config()?;
+    
+    config.set_str("user.name", name)?;
+    config.set_str("user.email", email)?;
+    
     Ok(())
 }
+
+/// Enhanced Git repository initialization with proper setup
+pub fn init_git_repo_enhanced(repo_path: &Path) -> Result<GitInitResult> {
+    // Check if already a git repository
+    if is_git_repository(repo_path) {
+        // Already a repository, check configuration
+        match get_git_config(repo_path) {
+            Ok(config) => {
+                if config.is_configured {
+                    return Ok(GitInitResult {
+                        success: true,
+                        message: "Git repository already exists and is properly configured".to_string(),
+                        needs_config: false,
+                        git_config: Some(config),
+                    });
+                } else {
+                    return Ok(GitInitResult {
+                        success: true,
+                        message: "Git repository exists but needs user configuration".to_string(),
+                        needs_config: true,
+                        git_config: Some(config),
+                    });
+                }
+            }
+            Err(_) => {
+                return Ok(GitInitResult {
+                    success: true,
+                    message: "Git repository exists but configuration could not be read".to_string(),
+                    needs_config: true,
+                    git_config: None,
+                });
+            }
+        }
+    }
+
+    // Initialize new repository
+    match Repository::init(repo_path) {
+        Ok(_) => {
+            // Create initial .gitignore file with common patterns
+            let gitignore_path = repo_path.join(".gitignore");
+            let gitignore_content = create_default_gitignore();
+            
+            if let Err(e) = fs::write(&gitignore_path, gitignore_content) {
+                eprintln!("Warning: Could not create .gitignore: {}", e);
+            }
+
+            // Check if git is configured globally
+            match Config::open_default() {
+                Ok(global_config) => {
+                    let has_global_name = global_config.get_string("user.name").is_ok();
+                    let has_global_email = global_config.get_string("user.email").is_ok();
+                    
+                    if has_global_name && has_global_email {
+                        // Global config exists, repository is ready
+                        Ok(GitInitResult {
+                            success: true,
+                            message: "Git repository initialized successfully with global configuration".to_string(),
+                            needs_config: false,
+                            git_config: get_git_config(repo_path).ok(),
+                        })
+                    } else {
+                        // No global config, need to set up user info
+                        Ok(GitInitResult {
+                            success: true,
+                            message: "Git repository initialized. Please configure user name and email.".to_string(),
+                            needs_config: true,
+                            git_config: Some(GitConfig {
+                                user_name: None,
+                                user_email: None,
+                                is_configured: false,
+                            }),
+                        })
+                    }
+                }
+                Err(_) => {
+                    // Could not read global config, assume we need local config
+                    Ok(GitInitResult {
+                        success: true,
+                        message: "Git repository initialized. Please configure user name and email.".to_string(),
+                        needs_config: true,
+                        git_config: Some(GitConfig {
+                            user_name: None,
+                            user_email: None,
+                            is_configured: false,
+                        }),
+                    })
+                }
+            }
+        }
+        Err(e) => Ok(GitInitResult {
+            success: false,
+            message: format!("Failed to initialize Git repository: {}", e),
+            needs_config: false,
+            git_config: None,
+        })
+    }
+}
+
+/// Create a default .gitignore file with common patterns
+fn create_default_gitignore() -> String {
+    "# Dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+
+# Build outputs
+dist/
+build/
+target/
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Temporary folders
+tmp/
+temp/
+".to_string()
+}
+
+/// Legacy function for backward compatibility
+pub fn init_git_repo(repo_path: &Path) -> Result<()> {
+    match init_git_repo_enhanced(repo_path) {
+        Ok(result) => {
+            if result.success {
+                Ok(())
+            } else {
+                Err(anyhow!(result.message))
+            }
+        }
+        Err(e) => Err(e)
+    }
+}
+

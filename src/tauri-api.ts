@@ -1,7 +1,7 @@
 // Tauri API wrapper for Tauri v2
 import { invoke } from '@tauri-apps/api/core';
 import { open as openDialog } from '@tauri-apps/plugin-dialog';
-import { readDir as fsReadDir, readTextFile as fsReadTextFile, writeTextFile as fsWriteTextFile, remove, rename, mkdir } from '@tauri-apps/plugin-fs';
+import { readDir as fsReadDir, readTextFile as fsReadTextFile, writeTextFile as fsWriteTextFile, mkdir } from '@tauri-apps/plugin-fs';
 
 // Extend window interface for Tauri properties
 declare global {
@@ -439,15 +439,50 @@ export { invoke };
 
 // Git Commands
 export const getGitStatus = async (projectPath: string) => {
+  console.log('📊 Getting Git status for:', projectPath);
+  
   if (isTauri) {
-    return await invoke('get_git_status', { projectPath });
+    try {
+      console.log('📞 Invoking get_git_status command');
+      const raw = await invoke('get_git_status', { projectPath }) as any;
+      console.log('✅ Git status retrieved (raw):', raw);
+
+      // Normalize snake_case from Rust to camelCase expected by UI
+      const normalized = {
+        branch: raw?.branch || '',
+        modified: raw?.modified || [],
+        untracked: raw?.untracked || [],
+        staged: raw?.staged || [],
+        isGitRepo: Boolean(raw?.is_git_repo ?? raw?.isGitRepo ?? false),
+      };
+      console.log('🔧 Git status normalized:', normalized);
+      return normalized;
+    } catch (error) {
+      console.error('❌ Failed to get Git status:', error);
+      return { branch: '', modified: [], untracked: [], staged: [], isGitRepo: false };
+    }
   }
+  
+  console.log('⚠️ Not in Tauri environment, returning mock Git status');
   return { branch: '', modified: [], untracked: [], staged: [], isGitRepo: false };
 };
 
 export const stageFile = async (projectPath: string, filePath: string) => {
+  console.log('📋 Staging file:', filePath, 'in project:', projectPath);
+  
   if (isTauri) {
-    return await invoke('stage_file', { projectPath, filePath });
+    try {
+      console.log('📞 Invoking stage_file command');
+      const result = await invoke('stage_file', { projectPath, filePath });
+      console.log('✅ File staged successfully');
+      return result;
+    } catch (error) {
+      console.error('❌ Failed to stage file:', error);
+      throw error;
+    }
+  } else {
+    console.warn('⚠️ Not in Tauri environment, cannot stage file');
+    throw new Error('Git staging not available in development mode');
   }
 };
 
@@ -472,8 +507,146 @@ export const getRecentCommits = async (projectPath: string, limit = 10) => {
 };
 
 export const initGitRepo = async (projectPath: string) => {
+  console.log('🔧 Initializing Git repository for:', projectPath);
+  
   if (isTauri) {
-    return await invoke('init_git_repo', { projectPath });
+    try {
+      console.log('📞 Invoking init_git_repo command');
+      const result = await invoke('init_git_repo', { projectPath });
+      console.log('✅ Git repository initialized successfully:', result);
+      return result;
+    } catch (error) {
+      console.error('❌ Failed to initialize Git repository:', error);
+      throw error;
+    }
+  } else {
+    console.warn('⚠️ Not in Tauri environment, cannot initialize Git repository');
+    throw new Error('Git initialization not available in development mode');
+  }
+};
+
+// Enhanced Git initialization with configuration support
+export const initGitRepoEnhanced = async (projectPath: string) => {
+  console.log('🔧 Enhanced Git repository initialization for:', projectPath);
+  
+  if (isTauri) {
+    try {
+      console.log('📞 Invoking init_git_repo_enhanced command');
+      const result = await invoke('init_git_repo_enhanced', { projectPath });
+      console.log('✅ Enhanced Git repository initialization result:', result);
+      return result;
+    } catch (error) {
+      console.error('❌ Failed to initialize Git repository with enhanced method:', error);
+      throw error;
+    }
+  } else {
+    console.warn('⚠️ Not in Tauri environment, cannot initialize Git repository');
+    throw new Error('Git initialization not available in development mode');
+  }
+};
+
+// Get Git configuration
+export const getGitConfig = async (projectPath: string) => {
+  console.log('📋 Getting Git configuration for:', projectPath);
+  
+  if (isTauri) {
+    try {
+      console.log('📞 Invoking get_git_config command');
+      const result = await invoke('get_git_config', { projectPath });
+      console.log('✅ Git configuration retrieved:', result);
+      return result;
+    } catch (error) {
+      console.error('❌ Failed to get Git configuration:', error);
+      throw error;
+    }
+  } else {
+    console.warn('⚠️ Not in Tauri environment, returning mock config');
+    return { user_name: null, user_email: null, is_configured: false };
+  }
+};
+
+// Set Git configuration
+export const setGitConfig = async (projectPath: string, name: string, email: string) => {
+  console.log('⚙️ Setting Git configuration for:', projectPath, { name, email });
+  
+  if (isTauri) {
+    try {
+      console.log('📞 Invoking set_git_config command');
+      const result = await invoke('set_git_config', { projectPath, name, email });
+      console.log('✅ Git configuration set successfully');
+      return result;
+    } catch (error) {
+      console.error('❌ Failed to set Git configuration:', error);
+      throw error;
+    }
+  } else {
+    console.warn('⚠️ Not in Tauri environment, cannot set Git configuration');
+    throw new Error('Git configuration not available in development mode');
+  }
+};
+
+// Check if directory is a Git repository
+export const isGitRepository = async (projectPath: string) => {
+  console.log('🔍 Checking if Git repository exists at:', projectPath);
+  
+  if (isTauri) {
+    try {
+      console.log('📞 Invoking is_git_repository command');
+      const result = await invoke('is_git_repository', { projectPath });
+      console.log('✅ Git repository check result:', result);
+      return result;
+    } catch (error) {
+      console.error('❌ Failed to check Git repository:', error);
+      return false;
+    }
+  } else {
+    console.warn('⚠️ Not in Tauri environment, returning false');
+    return false;
+  }
+};
+
+// Git Push/Pull operations
+export const gitPush = async (projectPath: string, remoteName = 'origin', branchName = 'main') => {
+  console.log('⬆️ Pushing to remote:', { projectPath, remoteName, branchName });
+  
+  if (isTauri) {
+    try {
+      console.log('📞 Invoking git_push command');
+      const result = await invoke('git_push', { 
+        projectPath, 
+        remoteName: remoteName === 'origin' ? null : remoteName,
+        branchName: branchName === 'main' ? null : branchName 
+      });
+      console.log('✅ Push completed successfully');
+      return result;
+    } catch (error) {
+      console.error('❌ Failed to push:', error);
+      throw error;
+    }
+  } else {
+    throw new Error('Git operations not available in development mode');
+  }
+};
+
+export const gitPull = async (projectPath: string, remoteName = 'origin', branchName = 'main') => {
+  console.log('⬇️ Pulling from remote:', { projectPath, remoteName, branchName });
+  
+  if (isTauri) {
+    try {
+      console.log('📞 Invoking git_pull command');
+      const result = await invoke('git_pull', { 
+        projectPath, 
+        remoteName: remoteName === 'origin' ? null : remoteName,
+        branchName: branchName === 'main' ? null : branchName 
+      });
+      console.log('✅ Pull completed successfully');
+      return result;
+    } catch (error) {
+      console.error('❌ Failed to pull:', error);
+      throw error;
+    }
+  } else {
+    throw new Error('Git operations not available in development mode');
   }
 };
 
@@ -508,20 +681,71 @@ export const createNewDirectory = async (dirPath: string) => {
 };
 
 export const renamePath = async (from: string, to: string) => {
-  if (isTauri) {
-    return await rename(from, to);
+  console.log(`renamePath called with from: ${from}, to: ${to}, isTauri: ${isTauri}`);
+
+  // Try Tauri first, regardless of detection (in case detection is faulty)
+  try {
+    console.log('Attempting to use Tauri custom rename_path command');
+    await invoke('rename_path', { from, to });
+    console.log('✅ Tauri custom command successfully renamed file');
+  } catch (error) {
+    console.error('❌ Tauri renamePath failed:', error);
+
+    if (isTauri) {
+      // If we detected Tauri but API failed, throw the error
+      throw error;
+    }
+
+    // Fallback to mock if Tauri is not available
+    console.log('🔄 Falling back to mock renamePath');
+    // For mock, we can't actually rename files, so throw an error
+    throw new Error('Rename operation not supported in development mode');
   }
 };
 
 export const deletePath = async (path: string) => {
-  if (isTauri) {
-    return await remove(path, { recursive: true });
+  console.log(`deletePath called with path: ${path}, isTauri: ${isTauri}`);
+
+  // Try Tauri first, regardless of detection (in case detection is faulty)
+  try {
+    console.log('Attempting to use Tauri custom delete_path command');
+    await invoke('delete_path', { path });
+    console.log('✅ Tauri custom command successfully deleted path');
+  } catch (error) {
+    console.error('❌ Tauri deletePath failed:', error);
+
+    if (isTauri) {
+      // If we detected Tauri but API failed, throw the error
+      throw error;
+    }
+
+    // Fallback to mock if Tauri is not available
+    console.log('🔄 Falling back to mock deletePath');
+    // For mock, we can't actually delete files, so throw an error
+    throw new Error('Delete operation not supported in development mode');
   }
 };
 
 export const movePath = async (from: string, to: string) => {
-  if (isTauri) {
-    return await rename(from, to);
+  console.log(`movePath called with from: ${from}, to: ${to}, isTauri: ${isTauri}`);
+
+  // Try Tauri first, regardless of detection (in case detection is faulty)
+  try {
+    console.log('Attempting to use Tauri custom move_path command');
+    await invoke('move_path', { from, to });
+    console.log('✅ Tauri custom command successfully moved path');
+  } catch (error) {
+    console.error('❌ Tauri movePath failed:', error);
+
+    if (isTauri) {
+      // If we detected Tauri but API failed, throw the error
+      throw error;
+    }
+
+    // Fallback to mock if Tauri is not available
+    console.log('🔄 Falling back to mock movePath');
+    // For mock, we can't actually move files, so throw an error
+    throw new Error('Move operation not supported in development mode');
   }
 };
 

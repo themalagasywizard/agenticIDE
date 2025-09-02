@@ -179,3 +179,4 @@ const GitCommitDialog: React.FC<GitCommitDialogProps> = ({
 };
 
 export default GitCommitDialog;
+

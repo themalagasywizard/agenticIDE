@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { open, readDir, readTextFile, writeTextFile, getGitStatus } from './tauri-api';
 import TopBar from './components/TopBar';
 import FileTree from './components/FileTree';
@@ -29,6 +29,7 @@ function App() {
   const [isCommitDialogOpen, setIsCommitDialogOpen] = useState<boolean>(false);
   const [gitStatus, setGitStatus] = useState<any>(null);
   const [gitBranch, setGitBranch] = useState<string>('');
+  const [showGitPanel, setShowGitPanel] = useState<boolean>(false);
 
   // Apply theme
   useEffect(() => {
@@ -61,6 +62,55 @@ function App() {
       if (event.ctrlKey && event.key === 'p') {
         event.preventDefault();
         setIsFileSearchOpen(true);
+      }
+
+      // Ctrl+Shift+G - Toggle Source Control (Git) panel
+      if (event.ctrlKey && event.shiftKey && event.key === 'G') {
+        event.preventDefault();
+        if (currentProject && gitStatus?.isGitRepo) {
+          setShowGitPanel(!showGitPanel);
+        }
+      }
+
+      // Ctrl+Enter - Quick commit (when in git context and files are staged)
+      if (event.ctrlKey && event.key === 'Enter' && gitStatus?.staged?.length > 0) {
+        event.preventDefault();
+        setIsCommitDialogOpen(true);
+      }
+
+      // Ctrl+K+G - Stage all changes (Cursor-like shortcut)
+      if (event.ctrlKey && event.key === 'k') {
+        // Wait for next key
+        const handleSecondKey = (e: KeyboardEvent) => {
+          if (e.key === 'g' || e.key === 'G') {
+            e.preventDefault();
+            // Stage all modified and untracked files
+            if (gitStatus?.modified?.length || gitStatus?.untracked?.length) {
+              const allChanges = [...(gitStatus.modified || []), ...(gitStatus.untracked || [])];
+              // This would need a "stage all" function - placeholder for now
+              console.log('Stage all shortcut triggered for files:', allChanges);
+            }
+          }
+          document.removeEventListener('keydown', handleSecondKey);
+        };
+        setTimeout(() => {
+          document.addEventListener('keydown', handleSecondKey);
+          setTimeout(() => document.removeEventListener('keydown', handleSecondKey), 1000);
+        }, 100);
+      }
+
+      // F5 - Refresh Git status and file tree
+      if (event.key === 'F5' && currentProject) {
+        event.preventDefault();
+        detectGitStatus(currentProject);
+        loadFileTree(currentProject);
+      }
+
+      // Ctrl+Shift+P - Push changes (when branch has commits)
+      if (event.ctrlKey && event.shiftKey && event.key === 'P' && gitStatus?.isGitRepo) {
+        event.preventDefault();
+        // This would trigger a push operation
+        console.log('Push shortcut triggered');
       }
     };
 
@@ -96,13 +146,21 @@ function App() {
       setGitStatus(status);
       if (status.isGitRepo) {
         setGitBranch(status.branch);
+        
+        // Auto-show git panel if there are changes OR if it's a newly initialized repo
+        const totalChanges = (status.staged?.length || 0) + (status.modified?.length || 0) + (status.untracked?.length || 0);
+        if (totalChanges > 0 || status.branch === 'main') {
+          setShowGitPanel(true);
+        }
       } else {
         setGitBranch('');
+        setShowGitPanel(false);
       }
     } catch (error) {
       console.error('Failed to detect Git status:', error);
       setGitBranch('');
       setGitStatus(null);
+      setShowGitPanel(false);
     }
   };
 
@@ -298,9 +356,15 @@ function App() {
             fileTree={fileTree}
             onFileClick={openFile}
             currentProject={currentProject}
-            onRefresh={() => loadFileTree(currentProject)}
+            onRefresh={() => {
+              loadFileTree(currentProject);
+              if (currentProject) detectGitStatus(currentProject);
+            }}
             onOpenCommitDialog={() => setIsCommitDialogOpen(true)}
             onLoadSubdirectory={loadSubdirectory}
+            gitStatus={gitStatus}
+            showGitPanel={showGitPanel}
+            onGitPanelToggle={setShowGitPanel}
           />
         </div>
 
