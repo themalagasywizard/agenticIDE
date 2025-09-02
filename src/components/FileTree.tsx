@@ -98,11 +98,12 @@ const FileTreeItem: React.FC<FileTreeItemProps> = ({
   const paddingLeft = level * 16 + 8;
 
   const handleClick = () => {
-    console.log('FileTreeItem clicked:', item.name, item.isDirectory);
+    console.log('🖱️ FileTreeItem clicked:', item.name, 'isDirectory:', item.isDirectory, 'path:', item.path);
     if (item.isDirectory) {
+      console.log('📁 Toggling folder:', item.path);
       onToggleFolder(item.path);
     } else {
-      console.log('Opening file:', item.path);
+      console.log('📄 Attempting to open file:', item.path);
       onFileClick(item.path);
     }
   };

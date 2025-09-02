@@ -152,19 +152,33 @@ function App() {
 
   const openFile = async (filePath: string) => {
     try {
+      console.log('🔍 Opening file:', filePath);
+      
       // Check if file is already open
       const existingIndex = openFiles.findIndex(file => file.path === filePath);
       if (existingIndex !== -1) {
+        console.log('📝 File already open at index:', existingIndex);
         setActiveFileIndex(existingIndex);
         return;
       }
 
+      console.log('📖 Reading file content...');
       const content = await readTextFile(filePath);
+      console.log('✅ File content loaded, length:', content.length);
+      
       const newFile = { path: filePath, content, isModified: false };
-      setOpenFiles(prev => [...prev, newFile]);
-      setActiveFileIndex(openFiles.length);
+      
+      // Update state and calculate the correct index
+      setOpenFiles(prev => {
+        const newOpenFiles = [...prev, newFile];
+        const newIndex = newOpenFiles.length - 1; // Index of the newly added file
+        console.log('📁 Adding file to openFiles. New array length:', newOpenFiles.length, 'New file index:', newIndex);
+        setActiveFileIndex(newIndex);
+        return newOpenFiles;
+      });
     } catch (error) {
-      console.error('Failed to open file:', error);
+      console.error('❌ Failed to open file:', error);
+      alert(`Failed to open file: ${error}`);
     }
   };
 

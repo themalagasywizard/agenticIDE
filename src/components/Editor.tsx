@@ -128,6 +128,9 @@ const CodeEditor: React.FC<EditorProps> = ({
   }
 
   const activeFile = files[activeFileIndex];
+  
+  // Debug logging
+  console.log('🎯 Editor render - files:', files.length, 'activeFileIndex:', activeFileIndex, 'activeFile:', activeFile ? activeFile.path : 'none');
 
   return (
     <div className="flex-1 flex flex-col">

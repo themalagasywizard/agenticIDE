@@ -352,20 +352,27 @@ const mockWriteTextFile = async (path: string, content: string) => {
 // Export the appropriate implementations
 export const open = isTauri ? openDialog : mockOpen;
 
-// Use Tauri V2 plugin for reading directories
+// Use our custom Tauri command for reading directories
 export const readDir = async (path: string) => {
   console.log(`readDir called with path: ${path}, isTauri: ${isTauri}`);
   
   // Try Tauri first, regardless of detection (in case detection is faulty)
   try {
-    console.log('Attempting to use Tauri fsReadDir for path:', path);
-    const entries = await fsReadDir(path);
-    console.log('✅ Tauri FS successfully returned entries:', entries);
-    // Transform Tauri FS Entry structure to match frontend expectations
-    const transformedEntries = entries.map((entry: any) => ({
+    console.log('Attempting to use Tauri custom list_directory command for path:', path);
+    const entries = await invoke('list_directory', { path }) as Array<{
+      name: string;
+      path: string;
+      is_directory: boolean;
+      size?: number;
+      modified?: number;
+    }>;
+    console.log('✅ Tauri custom command successfully returned entries:', entries);
+    
+    // Transform backend structure to match frontend expectations
+    const transformedEntries = entries.map((entry) => ({
       name: entry.name,
       path: entry.path,
-      children: entry.isDirectory ? [] : undefined, // Empty array for directories, undefined for files
+      children: entry.is_directory ? [] : undefined, // Empty array for directories, undefined for files
     }));
     console.log('Transformed entries:', transformedEntries);
     return transformedEntries;
@@ -388,10 +395,10 @@ export const readTextFile = async (path: string) => {
   
   // Try Tauri first, regardless of detection (in case detection is faulty)
   try {
-    console.log('Attempting to use Tauri fsReadTextFile for path:', path);
-    const content = await fsReadTextFile(path);
-    console.log('✅ Tauri FS successfully returned content, length:', content.length);
-    return content;
+    console.log('Attempting to use Tauri custom read_file_content command for path:', path);
+    const content = await invoke('read_file_content', { filePath: path }) as string;
+    console.log('✅ Tauri custom command successfully returned content, length:', content.length);
+    return content as string;
   } catch (error) {
     console.error('❌ Tauri readTextFile failed:', error);
     
@@ -407,10 +414,25 @@ export const readTextFile = async (path: string) => {
 };
 
 export const writeTextFile = async (path: string, content: string) => {
-  if (isTauri) {
-    return await fsWriteTextFile(path, content);
+  console.log(`writeTextFile called with path: ${path}, isTauri: ${isTauri}`);
+  
+  // Try Tauri first, regardless of detection (in case detection is faulty)
+  try {
+    console.log('Attempting to use Tauri custom write_file_content command for path:', path);
+    await invoke('write_file_content', { filePath: path, content });
+    console.log('✅ Tauri custom command successfully wrote file');
+  } catch (error) {
+    console.error('❌ Tauri writeTextFile failed:', error);
+    
+    if (isTauri) {
+      // If we detected Tauri but API failed, throw the error
+      throw error;
+    }
+    
+    // Fallback to mock if Tauri is not available
+    console.log('🔄 Falling back to mock writeTextFile for path:', path);
+    return mockWriteTextFile(path, content);
   }
-  return mockWriteTextFile(path, content);
 };
 
 export { invoke };
