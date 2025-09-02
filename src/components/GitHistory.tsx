@@ -14,12 +14,14 @@ interface GitHistoryProps {
   currentProject: string;
   gitBranch?: string;
   compact?: boolean;
+  refreshKey?: number;
 }
 
 const GitHistory: React.FC<GitHistoryProps> = ({ 
   currentProject, 
   gitBranch, 
-  compact = false 
+  compact = false,
+  refreshKey,
 }) => {
   const [commits, setCommits] = useState<GitCommit[]>([]);
   const [loading, setLoading] = useState(false);
@@ -29,7 +31,7 @@ const GitHistory: React.FC<GitHistoryProps> = ({
     if (currentProject) {
       loadCommits();
     }
-  }, [currentProject]);
+  }, [currentProject, refreshKey]);
 
   const loadCommits = async () => {
     if (!currentProject) return;

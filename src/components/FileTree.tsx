@@ -329,6 +329,7 @@ const FileTree: React.FC<FileTreeProps> = ({
   const [initialConfig, setInitialConfig] = useState<{ name: string | null; email: string | null }>({ name: null, email: null });
   const [activeTab, setActiveTab] = useState<'files' | 'sourceControl'>('files');
   const [historyHeight, setHistoryHeight] = useState<number>(192);
+  const [historyRefreshKey, setHistoryRefreshKey] = useState<number>(0);
 
   // Sync external toggle with local tab state
   useEffect(() => {
@@ -621,7 +622,7 @@ const FileTree: React.FC<FileTreeProps> = ({
                   <GitChanges
                     currentProject={currentProject}
                     onFileClick={onFileClick}
-                    onRefresh={() => { loadGitStatus(); onRefresh(); }}
+                    onRefresh={() => { loadGitStatus(); onRefresh(); setHistoryRefreshKey((k) => k + 1); }}
                     compact={false}
                   />
                 </div>
@@ -633,7 +634,7 @@ const FileTree: React.FC<FileTreeProps> = ({
                     const startHeight = historyHeight;
                     const onMove = (ev: MouseEvent) => {
                       const delta = ev.clientY - startY;
-                      const newH = Math.min(400, Math.max(120, startHeight + delta));
+                      const newH = Math.min(1200, Math.max(120, startHeight + delta));
                       setHistoryHeight(newH);
                     };
                     const onUp = () => {
@@ -645,7 +646,7 @@ const FileTree: React.FC<FileTreeProps> = ({
                   }}
                 />
                 <div className="overflow-hidden" style={{ height: historyHeight }}>
-                  <GitHistory currentProject={currentProject} gitBranch={currentGitStatus.branch} compact={true} />
+                  <GitHistory currentProject={currentProject} gitBranch={currentGitStatus.branch} compact={true} refreshKey={historyRefreshKey} />
                 </div>
               </>
             )}
