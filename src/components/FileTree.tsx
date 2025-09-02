@@ -10,6 +10,24 @@ import {
   initGitRepo
 } from '../tauri-api';
 
+// Extend window interface for Tauri properties
+declare global {
+  interface Window {
+    __TAURI_INTERNALS__?: any;
+    __TAURI__?: any;
+    tauri?: any;
+  }
+}
+
+// Check if we're likely using mock data
+const isMockDataMode = () => {
+  return typeof window !== "undefined" && (
+    typeof window.__TAURI_INTERNALS__ === "undefined" &&
+    typeof window.__TAURI__ === "undefined" &&
+    !('tauri' in window)
+  );
+};
+
 interface TabProps {
   isActive: boolean;
   onClick: () => void;
@@ -564,10 +582,17 @@ const FileTree: React.FC<FileTreeProps> = ({
 
   return (
     <div className="h-full flex flex-col bg-card">
-      {/* Subtle file count indicator */}
-      {process.env.NODE_ENV === 'development' && (
-        <div className="px-2 py-1 text-xs text-muted-foreground border-b border-border bg-muted/50">
-          Files: {fileTree.length}
+      {/* Mock data warning */}
+      {isMockDataMode() && (
+        <div className="px-2 py-1 text-xs text-orange-600 border-b border-orange-200 bg-orange-50 dark:bg-orange-900/20 dark:border-orange-800">
+          ⚠️ Using mock data - Run with "npm run tauri:dev" for real files
+        </div>
+      )}
+      
+      {/* Development mode info */}
+      {process.env.NODE_ENV === 'development' && !isMockDataMode() && (
+        <div className="px-2 py-1 text-xs text-green-600 border-b border-green-200 bg-green-50 dark:bg-green-900/20 dark:border-green-800">
+          ✅ Using real file system - Files: {fileTree.length}
         </div>
       )}
 

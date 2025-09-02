@@ -24,11 +24,7 @@
       "capabilities": ["default"]
     }
   },
-  "plugins": {
-    "fs": {},
-    "dialog": {},
-    "shell": {}
-  },
+  "plugins": {},
   "bundle": {
     "active": true,
     "targets": "all",
