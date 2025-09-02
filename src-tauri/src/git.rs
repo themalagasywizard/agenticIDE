@@ -5,6 +5,9 @@ use std::fs;
 use anyhow::{Result, anyhow};
 use git2::{BranchType};
 
+// Secure credential storage via OS keychain
+use keyring::Entry;
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct GitStatus {
     pub branch: String,
@@ -243,18 +246,34 @@ impl GitManager {
     pub fn push(&self, remote_name: &str, branch_name: &str, username: Option<&str>, password: Option<&str>) -> Result<()> {
         let repo = self.repo.as_ref().ok_or_else(|| anyhow!("Not a git repository"))?;
 
+        // Check if there are any commits to push
+        if let Ok(head) = repo.head() {
+            if head.target().is_none() {
+                return Err(anyhow!("No commits to push (repository is empty)"));
+            }
+        }
+
         // Find the remote
         let mut remote = match repo.find_remote(remote_name) {
             Ok(r) => r,
-            Err(_) => return Err(anyhow!(format!("RemoteNotFound:{}", remote_name))),
+            Err(_) => return Err(anyhow!(format!("Remote '{}' not found. Make sure to add the remote first: git remote add {} <url>", remote_name, remote_name))),
         };
+
+        // Resolve credentials: explicit > stored > none
+        let stored = load_stored_credentials(repo, remote_name).ok();
+        let resolved_username = username
+            .map(|s| s.to_string())
+            .or_else(|| stored.as_ref().map(|(u, _)| u.clone()));
+        let resolved_password = password
+            .map(|s| s.to_string())
+            .or_else(|| stored.as_ref().map(|(_, p)| p.clone()));
 
         // Set up callbacks for authentication (support SSH agent, HTTPS with user/pass or PAT, and default creds)
         let mut callbacks = RemoteCallbacks::new();
         callbacks.credentials(move |_url, username_from_url, allowed_types| {
-            // If caller provided username/password (or token), prefer that for HTTPS
+            // If caller provided or stored username/password (or token), prefer that for HTTPS
             if allowed_types.is_user_pass_plaintext() {
-                if let (Some(u), Some(p)) = (username, password) {
+                if let (Some(u), Some(p)) = (resolved_username.as_deref(), resolved_password.as_deref()) {
                     return Cred::userpass_plaintext(u, p);
                 }
             }
@@ -263,7 +282,7 @@ impl GitManager {
                 if let Some(u) = username_from_url {
                     if let Ok(cred) = Cred::ssh_key_from_agent(u) { return Ok(cred); }
                 }
-                if let Some(u) = username {
+                if let Some(u) = resolved_username.as_deref() {
                     if let Ok(cred) = Cred::ssh_key_from_agent(u) { return Ok(cred); }
                 }
             }
@@ -275,10 +294,25 @@ impl GitManager {
         let mut push_options = PushOptions::new();
         push_options.remote_callbacks(callbacks);
 
+        // Check if the local branch exists
+        let branch_exists = repo.find_branch(branch_name, BranchType::Local).is_ok();
+        if !branch_exists {
+            return Err(anyhow!("Local branch '{}' does not exist. Create it first: git checkout -b {}", branch_name, branch_name));
+        }
+
         // Push the branch
         let refspec = format!("refs/heads/{}:refs/heads/{}", branch_name, branch_name);
         if let Err(e) = remote.push(&[&refspec], Some(&mut push_options)) {
-            return Err(anyhow!(format!("PushFailed:{}", e.message())));
+            let error_msg = e.message();
+            if error_msg.contains("authentication") || error_msg.contains("403") || error_msg.contains("401") {
+                return Err(anyhow!("Authentication failed. Please check your credentials or Personal Access Token."));
+            } else if error_msg.contains("non-fast-forward") {
+                return Err(anyhow!("Push rejected - remote branch has diverged. Pull first to merge changes."));
+            } else if error_msg.contains("no upstream") {
+                return Err(anyhow!("Branch '{}' has no upstream branch set. The push may have succeeded but you should set the upstream: git branch --set-upstream-to=origin/{}", branch_name, branch_name));
+            } else {
+                return Err(anyhow!("Push failed: {}", error_msg));
+            }
         }
 
         // Try to set upstream if not set yet
@@ -311,6 +345,53 @@ impl GitManager {
         // to handle conflicts and different merge strategies
         Ok(())
     }
+}
+
+/// Create a keyring entry identifier based on remote URL and username
+fn keyring_entry(remote_url: &str, username: &str) -> Result<Entry, keyring::Error> {
+    // Use remote URL as service namespace; include app prefix
+    let service = format!("agentic-ide:git:{}", remote_url);
+    Entry::new(&service, username)
+}
+
+/// Load stored credentials (username, token) for a given remote
+fn load_stored_credentials(repo: &Repository, remote_name: &str) -> Result<(String, String)> {
+    let remote = repo.find_remote(remote_name)?;
+    let remote_url = remote.url().ok_or_else(|| anyhow!("Remote URL is missing or invalid"))?;
+
+    // Try common usernames: prefer stored list by probing a few likely usernames
+    // We don’t have a way to list keyring entries, so we try a set
+    let candidate_users = ["git", "github", "oauth", "token"];
+    for user in candidate_users.iter() {
+        if let Ok(entry) = keyring_entry(remote_url, user) {
+            if let Ok(secret) = entry.get_password() {
+                return Ok((user.to_string(), secret));
+            }
+        }
+    }
+
+    Err(anyhow!("No stored credentials found"))
+}
+
+/// Save credentials (username + token) to OS keychain for a given remote
+pub fn save_git_credentials(repo_path: &Path, remote_name: &str, username: &str, password: &str) -> Result<()> {
+    let repo = Repository::open(repo_path)?;
+    let remote = repo.find_remote(remote_name)?;
+    let remote_url = remote.url().ok_or_else(|| anyhow!("Remote URL is missing or invalid"))?;
+    let entry = keyring_entry(remote_url, username)?;
+    entry.set_password(password)?;
+    Ok(())
+}
+
+/// Clear stored credentials for a given remote and username
+pub fn clear_git_credentials(repo_path: &Path, remote_name: &str, username: &str) -> Result<()> {
+    let repo = Repository::open(repo_path)?;
+    let remote = repo.find_remote(remote_name)?;
+    let remote_url = remote.url().ok_or_else(|| anyhow!("Remote URL is missing or invalid"))?;
+    let entry = keyring_entry(remote_url, username)?;
+    // Ignore not found errors
+    let _ = entry.delete_password();
+    Ok(())
 }
 
 /// Check if a directory is already a Git repository

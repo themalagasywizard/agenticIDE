@@ -35,6 +35,8 @@ pub fn run() {
       is_git_repository,
       git_push,
       git_pull,
+      save_git_credentials_cmd,
+      clear_git_credentials_cmd,
       list_directory,
       create_file,
       create_directory,
@@ -152,6 +154,26 @@ async fn git_pull(project_path: String, remote_name: Option<String>, branch_name
   match git_manager.pull(&remote, &branch) {
     Ok(_) => Ok(()),
     Err(e) => Err(format!("Failed to pull: {}", e)),
+  }
+}
+
+// Store credentials securely in OS keychain
+#[tauri::command]
+async fn save_git_credentials_cmd(project_path: String, remote_name: Option<String>, username: String, password: String) -> Result<(), String> {
+  let remote = remote_name.unwrap_or_else(|| "origin".to_string());
+  match crate::git::save_git_credentials(Path::new(&project_path), &remote, &username, &password) {
+    Ok(_) => Ok(()),
+    Err(e) => Err(format!("Failed to save credentials: {}", e)),
+  }
+}
+
+// Clear stored credentials
+#[tauri::command]
+async fn clear_git_credentials_cmd(project_path: String, remote_name: Option<String>, username: String) -> Result<(), String> {
+  let remote = remote_name.unwrap_or_else(|| "origin".to_string());
+  match crate::git::clear_git_credentials(Path::new(&project_path), &remote, &username) {
+    Ok(_) => Ok(()),
+    Err(e) => Err(format!("Failed to clear credentials: {}", e)),
   }
 }
 

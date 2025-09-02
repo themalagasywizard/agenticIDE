@@ -401,7 +401,7 @@ const GitChanges: React.FC<GitChangesProps> = ({
                   onRefresh();
                 } catch (error) {
                   console.error('Pull failed:', error);
-                  const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+                  const errorMsg = error instanceof Error ? error.message : String(error ?? 'Unknown error');
                   alert(`Pull failed: ${errorMsg}`);
                 }
               }}
@@ -418,23 +418,35 @@ const GitChanges: React.FC<GitChangesProps> = ({
                   onRefresh();
                 } catch (error) {
                   console.error('Push failed:', error);
-                  const msg = (error as any)?.message?.toString() || '';
+                  const msg = typeof error === 'string' ? error : ((error as any)?.message?.toString() ?? String(error ?? ''));
                   // If auth error, prompt for credentials/PAT and retry once
                   if (/auth|denied|401|403|credentials/i.test(msg)) {
                     const username = prompt('Enter Git username (for PAT, use "git" or your username):', 'git') || 'git';
                     if (!username) return;
-                    const password = prompt('Enter Personal Access Token (will not be stored):', '') || '';
+                    const password = prompt('Enter Personal Access Token (will not be stored unless you choose to save it):', '') || '';
                     if (!password) return;
                     try {
                       await gitPush(currentProject, { username, password });
                       await loadGitStatus();
                       onRefresh();
+                      // Offer to save the token securely for future pushes
+                      const save = confirm('Save this token securely in Windows Credential Manager for future pushes?');
+                      if (save) {
+                        try {
+                          const { saveGitCredentials } = await import('../tauri-api');
+                          await saveGitCredentials(currentProject, username, password);
+                          alert('Token saved securely. Future pushes will use it automatically.');
+                        } catch (saveErr) {
+                          console.error('Failed to save credentials:', saveErr);
+                          alert('Push succeeded, but failed to save credentials. You may be prompted again next time.');
+                        }
+                      }
                     } catch (e2) {
-                      const errorMsg2 = e2 instanceof Error ? e2.message : 'Unknown error';
+                      const errorMsg2 = e2 instanceof Error ? e2.message : String(e2 ?? 'Unknown error');
                       alert(`Push failed after authentication: ${errorMsg2}`);
                     }
                   } else {
-                    const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+                    const errorMsg = error instanceof Error ? error.message : String(error ?? 'Unknown error');
                     alert(`Push failed: ${errorMsg}`);
                   }
                 }

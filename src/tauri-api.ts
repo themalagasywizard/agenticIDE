@@ -632,6 +632,16 @@ export const gitPush = async (projectPath: string, options?: { remoteName?: stri
   }
 };
 
+export const saveGitCredentials = async (projectPath: string, username: string, password: string, remoteName = 'origin') => {
+  if (!isTauri) throw new Error('Credentials storage not available in development mode');
+  return await invoke('save_git_credentials_cmd', { projectPath, remoteName: remoteName === 'origin' ? null : remoteName, username, password });
+};
+
+export const clearGitCredentials = async (projectPath: string, username: string, remoteName = 'origin') => {
+  if (!isTauri) throw new Error('Credentials storage not available in development mode');
+  return await invoke('clear_git_credentials_cmd', { projectPath, remoteName: remoteName === 'origin' ? null : remoteName, username });
+};
+
 export const gitPull = async (projectPath: string, remoteName = 'origin', branchName = 'main') => {
   console.log('⬇️ Pulling from remote:', { projectPath, remoteName, branchName });
   

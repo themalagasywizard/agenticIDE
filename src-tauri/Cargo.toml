@@ -33,3 +33,4 @@ notify = "6.1"
 walkdir = "2.5"
 chrono = { version = "0.4", features = ["serde"] }
 anyhow = "1.0"
+keyring = "2"
