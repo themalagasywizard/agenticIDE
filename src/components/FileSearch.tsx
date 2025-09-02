@@ -141,7 +141,7 @@ const FileSearch: React.FC<FileSearchProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-start justify-center pt-20 z-50">
+    <div className="fixed inset-0 bg-black/50 flex items-start justify-center pt-20 z-[10003]">
       <div className="card-modern shadow-modern-lg w-96 max-w-[90vw] max-h-96 overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-border">

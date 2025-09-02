@@ -79,6 +79,7 @@ interface FileTreeItemProps {
   onUnstageFile?: (filePath: string) => void;
   onRenameFile?: (oldPath: string, newName: string) => void;
   onDeleteFile?: (filePath: string) => void;
+  loadedDirectories?: Map<string, FileItem[]>;
 }
 
 const FileTreeItem: React.FC<FileTreeItemProps> = ({
@@ -92,10 +93,12 @@ const FileTreeItem: React.FC<FileTreeItemProps> = ({
   onStageFile,
   onUnstageFile,
   onRenameFile,
-  onDeleteFile
+  onDeleteFile,
+  loadedDirectories
 }) => {
   const isExpanded = expandedFolders.has(item.path);
   const paddingLeft = level * 16 + 8;
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; visible: boolean } | null>(null);
 
   const handleClick = () => {
     console.log('🖱️ FileTreeItem clicked:', item.name, 'isDirectory:', item.isDirectory, 'path:', item.path);
@@ -107,6 +110,33 @@ const FileTreeItem: React.FC<FileTreeItemProps> = ({
       onFileClick(item.path);
     }
   };
+
+  const handleContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setContextMenu({
+      x: e.clientX,
+      y: e.clientY,
+      visible: true
+    });
+  };
+
+  const handleContextMenuAction = (action: 'rename' | 'delete') => {
+    if (action === 'rename' && onRenameFile) {
+      handleRename();
+    } else if (action === 'delete' && onDeleteFile) {
+      handleDelete();
+    }
+    setContextMenu(null);
+  };
+
+  // Close context menu when clicking elsewhere
+  useEffect(() => {
+    const handleClickOutside = () => {
+      setContextMenu(null);
+    };
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, []);
 
   const getGitStatus = () => {
     if (!gitStatus?.isGitRepo || item.isDirectory) return null;
@@ -194,6 +224,7 @@ const FileTreeItem: React.FC<FileTreeItemProps> = ({
         className="group relative file-tree-item"
         style={{ paddingLeft }}
         onClick={handleClick}
+        onContextMenu={handleContextMenu}
       >
         <span className="mr-2">{getFileIcon(item.name, item.isDirectory)}</span>
         <span className={`truncate ${item.isDirectory ? 'folder' : ''}`}>
@@ -205,62 +236,40 @@ const FileTreeItem: React.FC<FileTreeItemProps> = ({
           </span>
         )}
 
-        {/* File operation buttons */}
-        <div className="absolute right-1 top-1/2 transform -translate-y-1/2 opacity-0 group-hover:opacity-100 flex space-x-1">
-          {gitStatus && gitStatusType === 'modified' && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                handleStage();
-              }}
-              className="p-1 rounded hover:bg-green-500/20 hover:text-green-600 text-xs"
-              title="Stage file"
-            >
-              +
-            </button>
-          )}
-          {gitStatus && gitStatusType === 'staged' && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                handleUnstage();
-              }}
-              className="p-1 rounded hover:bg-orange-500/20 hover:text-orange-600 text-xs"
-              title="Unstage file"
-            >
-              -
-            </button>
-          )}
-          {onRenameFile && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                handleRename();
-              }}
-              className="p-1 rounded hover:bg-blue-500/20 hover:text-blue-600 text-xs"
-              title="Rename"
-            >
-              ✏️
-            </button>
-          )}
-          {onDeleteFile && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                handleDelete();
-              }}
-              className="p-1 rounded hover:bg-red-500/20 hover:text-red-600 text-xs"
-              title="Delete"
-            >
-              🗑️
-            </button>
-          )}
-        </div>
+        {/* Git status indicators (only for Git tab) */}
+        {gitStatus && (
+          <div className="absolute right-1 top-1/2 transform -translate-y-1/2 flex space-x-1">
+            {gitStatusType === 'modified' && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleStage();
+                }}
+                className="p-1 rounded hover:bg-green-500/20 hover:text-green-600 text-xs"
+                title="Stage file"
+              >
+                +
+              </button>
+            )}
+            {gitStatusType === 'staged' && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleUnstage();
+                }}
+                className="p-1 rounded hover:bg-orange-500/20 hover:text-orange-600 text-xs"
+                title="Unstage file"
+              >
+                -
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
-      {item.isDirectory && isExpanded && item.children && (
+      {item.isDirectory && isExpanded && loadedDirectories && loadedDirectories.has(item.path) && (
         <div>
-          {item.children.map((child) => (
+          {loadedDirectories.get(item.path)!.map((child) => (
             <FileTreeItem
               key={child.path}
               item={child}
@@ -274,8 +283,35 @@ const FileTreeItem: React.FC<FileTreeItemProps> = ({
               onUnstageFile={onUnstageFile}
               onRenameFile={onRenameFile}
               onDeleteFile={onDeleteFile}
+              loadedDirectories={loadedDirectories}
             />
           ))}
+        </div>
+      )}
+
+      {/* Context Menu */}
+      {contextMenu?.visible && (onRenameFile || onDeleteFile) && (
+        <div
+          className="fixed z-[10002] bg-card border border-border rounded-md shadow-lg py-1 min-w-32"
+          style={{ left: contextMenu.x, top: contextMenu.y }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {onRenameFile && (
+            <button
+              onClick={() => handleContextMenuAction('rename')}
+              className="w-full text-left px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground"
+            >
+              ✏️ Rename
+            </button>
+          )}
+          {onDeleteFile && (
+            <button
+              onClick={() => handleContextMenuAction('delete')}
+              className="w-full text-left px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground text-destructive"
+            >
+              🗑️ Delete
+            </button>
+          )}
         </div>
       )}
     </div>
@@ -287,11 +323,13 @@ const FileTree: React.FC<FileTreeProps> = ({
   onFileClick,
   currentProject,
   onRefresh,
-  onOpenCommitDialog
+  onOpenCommitDialog,
+  onLoadSubdirectory
 }) => {
   const [activeTab, setActiveTab] = useState<'files' | 'git'>('files');
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
   const [gitStatus, setGitStatus] = useState<GitStatus | null>(null);
+  const [loadedDirectories, setLoadedDirectories] = useState<Map<string, FileItem[]>>(new Map());
 
   // Debug logging
   console.log('FileTree rendering:', { currentProject, fileTree: fileTree.length, activeTab });
@@ -392,16 +430,35 @@ const FileTree: React.FC<FileTreeProps> = ({
     }
   };
 
-  const toggleFolder = (path: string) => {
+  const toggleFolder = async (path: string) => {
+    const isCurrentlyExpanded = expandedFolders.has(path);
+
     setExpandedFolders(prev => {
       const newSet = new Set(prev);
-      if (newSet.has(path)) {
+      if (isCurrentlyExpanded) {
         newSet.delete(path);
       } else {
         newSet.add(path);
       }
       return newSet;
     });
+
+    // If expanding and not already loaded, load the subdirectory contents
+    if (!isCurrentlyExpanded && onLoadSubdirectory && !loadedDirectories.has(path)) {
+      try {
+        console.log('📁 Loading subdirectory contents for:', path);
+        const subItems = await onLoadSubdirectory(path);
+        console.log('📁 Loaded subdirectory items:', subItems.length);
+
+        setLoadedDirectories(prev => {
+          const newMap = new Map(prev);
+          newMap.set(path, subItems);
+          return newMap;
+        });
+      } catch (error) {
+        console.error('❌ Failed to load subdirectory:', error);
+      }
+    }
   };
 
   if (!currentProject) {
@@ -468,6 +525,7 @@ const FileTree: React.FC<FileTreeProps> = ({
               onUnstageFile={undefined}
               onRenameFile={renameFile}
               onDeleteFile={deleteFile}
+              loadedDirectories={loadedDirectories}
             />
           ))
         )}
@@ -550,6 +608,7 @@ const FileTree: React.FC<FileTreeProps> = ({
                 onUnstageFile={handleUnstageFile}
                 onRenameFile={undefined} // No rename in Git tab
                 onDeleteFile={undefined} // No delete in Git tab
+                loadedDirectories={loadedDirectories}
               />
             ))}
           </div>
@@ -590,10 +649,10 @@ const FileTree: React.FC<FileTreeProps> = ({
         </div>
       )}
       
-      {/* Development mode info */}
-      {process.env.NODE_ENV === 'development' && !isMockDataMode() && (
-        <div className="px-2 py-1 text-xs text-green-600 border-b border-green-200 bg-green-50 dark:bg-green-900/20 dark:border-green-800">
-          ✅ Using real file system - Files: {fileTree.length}
+      {/* Project directory display */}
+      {currentProject && (
+        <div className="px-2 py-1 text-xs text-muted-foreground border-b border-border bg-muted/30">
+          📂 {currentProject}
         </div>
       )}
 

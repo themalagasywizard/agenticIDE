@@ -47,9 +47,7 @@ function App() {
       // Ctrl+S - Save file
       if (event.ctrlKey && event.key === 's') {
         event.preventDefault();
-        if (activeFileIndex !== -1) {
-          saveFile(activeFileIndex);
-        }
+        saveCurrentFile();
       }
 
       // Ctrl+Shift+T - New terminal tab (placeholder for now)
@@ -205,6 +203,29 @@ function App() {
   };
 
   const closeFile = (index: number) => {
+    const fileToClose = openFiles[index];
+
+    // Check if file has unsaved changes
+    if (fileToClose && fileToClose.isModified) {
+      const shouldSave = window.confirm(
+        `File "${fileToClose.path.split(/[/\\]/).pop()}" has unsaved changes. Do you want to save before closing?`
+      );
+
+      if (shouldSave) {
+        // Save the file before closing
+        saveFile(index).then(() => {
+          // After saving, close the file
+          performCloseFile(index);
+        });
+        return;
+      }
+    }
+
+    // Close the file
+    performCloseFile(index);
+  };
+
+  const performCloseFile = (index: number) => {
     setOpenFiles(prev => prev.filter((_, i) => i !== index));
     if (activeFileIndex === index) {
       setActiveFileIndex(-1);
@@ -217,6 +238,42 @@ function App() {
     setIsDarkMode(prev => !prev);
   };
 
+  // Save current file
+  const saveCurrentFile = () => {
+    if (activeFileIndex !== -1) {
+      saveFile(activeFileIndex);
+    }
+  };
+
+  // Save project as new folder
+  const saveProjectAs = async () => {
+    if (!currentProject) {
+      alert('No project to save');
+      return;
+    }
+
+    try {
+      // For now, we'll just copy the current project to a new location
+      // In a real implementation, you'd use Tauri's dialog API to let user choose destination
+      const newProjectName = prompt('Enter new project name:');
+      if (!newProjectName) return;
+
+      // This is a placeholder - in a real implementation you'd:
+      // 1. Use Tauri's dialog to choose destination folder
+      // 2. Copy all files from current project to new location
+      // 3. Update currentProject to new path
+
+      alert(`Save Project As functionality would copy "${currentProject}" to "${newProjectName}"`);
+      // TODO: Implement actual project copying logic
+    } catch (error) {
+      console.error('Failed to save project as:', error);
+      alert('Failed to save project');
+    }
+  };
+
+  // Check if any files have unsaved changes
+  const hasUnsavedChanges = openFiles.some(file => file.isModified);
+
   return (
     <div className="h-screen flex flex-col bg-background text-foreground">
       <TopBar
@@ -226,6 +283,9 @@ function App() {
         onOpenRecentProjects={() => setIsRecentProjectsOpen(true)}
         onToggleTheme={toggleTheme}
         isDarkMode={isDarkMode}
+        onSaveFile={saveCurrentFile}
+        onSaveProjectAs={saveProjectAs}
+        hasUnsavedChanges={hasUnsavedChanges}
       />
 
       <div className="flex flex-1 overflow-hidden">
