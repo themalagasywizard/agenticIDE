@@ -1,0 +1,171 @@
+ChatGPT a dit :
+
+Here’s a Phase 1 PRD (Product Requirements Document) tailored for your agentic IDE project. This sets a clear scope so you can implement the UI + terminal foundation before AI or Git logic.
+
+Product Requirements Document (PRD) – Phase 1
+
+Product Name: Agentic IDE (codename)
+Phase: 1 – Core UI Foundation
+Author: [You]
+Date: [Insert date]
+
+1. Objective
+
+Build the foundation of the IDE: a fast, lightweight desktop app with a split-pane UI (file tree, editor, terminal). The goal is to deliver a usable environment for local coding and command execution without AI or Git integrations.
+
+This phase should establish a trustworthy developer experience: fast startup, smooth editing, and a modern terminal feel.
+
+2. Key Features
+2.1 Application Shell
+
+Built using Tauri (Rust backend + React frontend) for performance and small binary size.
+
+Cross-platform support: macOS, Linux, Windows.
+
+2.2 Layout
+
+Sidebar (Left):
+
+File tree of the current project directory.
+
+Expand/collapse folders.
+
+Click to open files in editor.
+
+Editor (Center):
+
+Monaco Editor integration.
+
+Syntax highlighting (TS, JS, Python, Rust).
+
+Open multiple files in tabbed view.
+
+Basic file save (Ctrl+S).
+
+Terminal (Bottom):
+
+xterm.js rendering.
+
+Connected to OS shell via PTY (node-pty or Rust pty).
+
+Execute commands in project directory.
+
+Scrollback + resize support.
+
+Multiple terminal tabs.
+
+Top Bar (Global Navigation):
+
+Project name / path display.
+
+Settings button (placeholder page).
+
+Dark/Light mode toggle.
+
+2.3 File Management
+
+Open local folder as workspace.
+
+Navigate folder structure.
+
+Create new file/folder (stub, actual FS write optional in this phase).
+
+2.4 Terminal Features
+
+Run standard shell commands (pwd, ls, echo hello).
+
+Render commands and outputs as blocks (UI only, no AI yet).
+
+Ability to clear terminal.
+
+Support ANSI colors (xterm.js built-in).
+
+3. Non-Goals (Phase 1)
+
+No AI integration (OpenRouter, completions, or diffs).
+
+No Git integration (status, commits, PRs).
+
+No LSP or code intelligence beyond Monaco syntax highlighting.
+
+No multi-project management.
+
+4. UX Requirements
+
+Performance:
+
+App launches in <3s.
+
+Editor input latency <50ms.
+
+Terminal command response near real-time.
+
+Look & Feel:
+
+Minimal, modern UI inspired by Warp/VSCode.
+
+Smooth transitions, consistent dark/light mode.
+
+Tabs for files and terminals should feel natural.
+
+Keyboard Shortcuts:
+
+Ctrl+O – Open folder.
+
+Ctrl+S – Save file.
+
+Ctrl+Shift+T – New terminal tab.
+
+Ctrl+P – File search (placeholder).
+
+5. Technical Requirements
+
+Frontend: React + Tailwind.
+
+Editor: Monaco Editor.
+
+Terminal: xterm.js + PTY integration (node-pty in Tauri/Electron).
+
+Backend: Rust (Tauri) for filesystem + process management.
+
+File Persistence: Direct writes to local FS.
+
+State: Local-only (no cloud sync).
+
+6. Success Metrics
+
+✅ Users can open a project folder, browse files, open/edit/save code.
+
+✅ Users can run commands in the integrated terminal.
+
+✅ App feels snappy and stable with no noticeable lag.
+
+✅ UI layout matches “IDE with terminal” baseline (foundation for future phases).
+
+7. Risks & Mitigations
+
+Risk: PTY integration issues across platforms.
+
+Mitigation: Test node-pty on macOS/Linux/Windows early. Provide fallback shell if needed.
+
+Risk: Monaco asset bundling in Tauri may cause size/perf issues.
+
+Mitigation: Use local bundling, not CDN.
+
+Risk: Scope creep (temptation to add AI early).
+
+Mitigation: Strictly keep Phase 1 to UI + terminal + file editing.
+
+8. Deliverables
+
+Cross-platform desktop binary.
+
+File tree + Monaco editor + xterm.js terminal in a 3-pane layout.
+
+Settings page (placeholder for future OpenRouter key).
+
+Minimal documentation:
+
+Install & run instructions.
+
+Shortcuts reference.

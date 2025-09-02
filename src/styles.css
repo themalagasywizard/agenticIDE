@@ -1,0 +1,257 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+    --primary: 262 83% 58%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96%;
+    --secondary-foreground: 222.2 84% 4.9%;
+    --muted: 210 40% 96%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 96%;
+    --accent-foreground: 222.2 84% 4.9%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 262 83% 58%;
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 263 70% 50%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 263 70% 50%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* Terminal styling */
+.terminal-container {
+  background-color: #1e1e1e;
+  color: #f8f8f2;
+}
+
+.terminal-container .xterm-viewport {
+  background-color: #1e1e1e !important;
+}
+
+.terminal-container .xterm-rows {
+  font-family: 'Fira Code', 'Consolas', 'Monaco', monospace;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+/* Command Block styling */
+.command-block {
+  @apply bg-background border border-border rounded-md p-3 font-mono text-sm transition-all duration-200;
+}
+
+.command-block:hover {
+  @apply shadow-md;
+}
+
+.command-block.running {
+  @apply border-blue-500/50 shadow-blue-500/20 shadow-md;
+}
+
+.command-block.success {
+  @apply border-green-500/30;
+}
+
+.command-block.error {
+  @apply border-red-500/30;
+}
+
+.command-input {
+  @apply flex-1 bg-transparent border-none outline-none font-mono text-sm placeholder-muted-foreground;
+}
+
+.command-input:focus {
+  @apply ring-0;
+}
+
+/* Terminal scrollbar */
+.terminal-scroll::-webkit-scrollbar {
+  width: 8px;
+}
+
+.terminal-scroll::-webkit-scrollbar-track {
+  @apply bg-muted/20;
+}
+
+.terminal-scroll::-webkit-scrollbar-thumb {
+  @apply bg-muted-foreground/30 rounded;
+}
+
+.terminal-scroll::-webkit-scrollbar-thumb:hover {
+  @apply bg-muted-foreground/50;
+}
+
+/* Modern shadows and effects */
+.shadow-modern {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+.shadow-modern-lg {
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+/* Smooth transitions */
+.transition-smooth {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Focus states */
+.focus-modern:focus {
+  @apply outline-none ring-2 ring-primary/50 ring-offset-2 ring-offset-background;
+}
+
+/* Hover effects */
+.hover-lift:hover {
+  transform: translateY(-1px);
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Button styles */
+.btn-modern {
+  @apply px-4 py-2 rounded-md font-medium transition-smooth focus-modern hover-lift;
+}
+
+.btn-primary {
+  @apply bg-primary text-primary-foreground hover:bg-primary/90;
+}
+
+.btn-secondary {
+  @apply bg-secondary text-secondary-foreground hover:bg-secondary/80;
+}
+
+.btn-ghost {
+  @apply bg-transparent hover:bg-accent hover:text-accent-foreground;
+}
+
+/* Input styles */
+.input-modern {
+  @apply bg-background border border-input rounded-md px-3 py-2 text-sm focus-modern transition-smooth;
+}
+
+/* Card styles */
+.card-modern {
+  @apply bg-card border border-border rounded-lg shadow-modern transition-smooth;
+}
+
+/* Tab styles */
+.tab-navigation {
+  @apply flex border-b border-border bg-card;
+}
+
+.tab-button {
+  @apply px-4 py-2 text-sm font-medium border-b-2 transition-colors;
+}
+
+.tab-button.active {
+  @apply border-primary text-foreground;
+}
+
+.tab-button.inactive {
+  @apply border-transparent text-muted-foreground hover:text-foreground;
+}
+
+/* File tree styling */
+.file-tree-item {
+  @apply flex items-center px-2 py-1 text-sm hover:bg-accent hover:text-accent-foreground cursor-pointer transition-colors;
+}
+
+.file-tree-item.selected {
+  @apply bg-accent text-accent-foreground;
+}
+
+.file-tree-item.folder {
+  @apply font-medium;
+}
+
+/* Monaco editor container */
+.editor-container {
+  @apply flex-1 overflow-hidden;
+}
+
+/* Tab styling */
+.tab {
+  @apply flex items-center px-4 py-2 text-sm border-r border-border bg-background hover:bg-accent hover:text-accent-foreground cursor-pointer transition-colors;
+}
+
+.tab.active {
+  @apply bg-accent text-accent-foreground;
+}
+
+.tab-close {
+  @apply ml-2 p-1 rounded hover:bg-destructive hover:text-destructive-foreground;
+}
+
+/* Scrollbar utilities */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* Enhanced tab styling */
+.tab-modern {
+  @apply relative flex items-center px-4 py-2 text-sm border-r border-border/50 cursor-pointer transition-all duration-150 hover:bg-accent/50;
+}
+
+.tab-modern.active {
+  @apply bg-background text-foreground shadow-sm border-b-2 border-b-primary;
+}
+
+.tab-modern.inactive {
+  @apply bg-card text-muted-foreground hover:text-foreground;
+}
+
+.tab-close-modern {
+  @apply ml-2 p-1 rounded opacity-0 hover:bg-destructive/20 hover:text-destructive transition-all duration-150;
+}
+
+/* Resizer styling */
+.resizer {
+  @apply bg-border hover:bg-accent cursor-col-resize;
+}
+
+.resizer-horizontal {
+  @apply w-1 cursor-row-resize;
+}
