@@ -4,6 +4,7 @@ use std::path::Path;
 use std::fs;
 use anyhow::{Result, anyhow};
 use git2::{BranchType};
+use std::collections::HashMap;
 
 // Secure credential storage via OS keychain
 use keyring::Entry;
@@ -609,5 +610,63 @@ pub fn init_git_repo(repo_path: &Path) -> Result<()> {
         }
         Err(e) => Err(e)
     }
+}
+
+/// Git credentials structure for storage
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct GitCredentials {
+    pub username: String,
+    pub token: String,
+    pub remote_url: String,
+}
+
+/// Get stored Git credentials for a project
+pub fn get_git_credentials(project_path: &Path) -> Result<Option<GitCredentials>> {
+    let service_name = format!("ide-terminal-git-{}", project_path.to_string_lossy());
+    let username_entry = Entry::new(&service_name, "username")?;
+    let token_entry = Entry::new(&service_name, "token")?;
+    let remote_entry = Entry::new(&service_name, "remote_url")?;
+
+    match (username_entry.get_password(), token_entry.get_password(), remote_entry.get_password()) {
+        (Ok(username), Ok(token), Ok(remote_url)) => {
+            Ok(Some(GitCredentials {
+                username,
+                token,
+                remote_url,
+            }))
+        }
+        _ => Ok(None)
+    }
+}
+
+/// Store Git credentials for a project
+pub fn set_git_credentials(project_path: &Path, credentials: GitCredentials) -> Result<()> {
+    let service_name = format!("ide-terminal-git-{}", project_path.to_string_lossy());
+
+    let username_entry = Entry::new(&service_name, "username")?;
+    let token_entry = Entry::new(&service_name, "token")?;
+    let remote_entry = Entry::new(&service_name, "remote_url")?;
+
+    username_entry.set_password(&credentials.username)?;
+    token_entry.set_password(&credentials.token)?;
+    remote_entry.set_password(&credentials.remote_url)?;
+
+    Ok(())
+}
+
+/// Delete stored Git credentials for a project
+pub fn delete_git_credentials(project_path: &Path) -> Result<()> {
+    let service_name = format!("ide-terminal-git-{}", project_path.to_string_lossy());
+
+    let username_entry = Entry::new(&service_name, "username")?;
+    let token_entry = Entry::new(&service_name, "token")?;
+    let remote_entry = Entry::new(&service_name, "remote_url")?;
+
+    // Try to delete each entry, ignore errors if they don't exist
+    let _ = username_entry.delete_password();
+    let _ = token_entry.delete_password();
+    let _ = remote_entry.delete_password();
+
+    Ok(())
 }
 

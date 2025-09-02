@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  getGitStatus, 
-  stageFile, 
-  unstageFile, 
+import {
+  getGitStatus,
+  stageFile,
+  unstageFile,
   commitChanges,
   initGitRepo,
   gitPush,
-  gitPull
+  gitPull,
+  getGitCredentials
 } from '../tauri-api';
 
 interface GitStatus {
@@ -413,37 +414,58 @@ const GitChanges: React.FC<GitChangesProps> = ({
             <button
               onClick={async () => {
                 try {
-                  await gitPush(currentProject);
+                  // First try to get stored credentials
+                  const storedCredentials = await getGitCredentials(currentProject);
+
+                  if (storedCredentials) {
+                    // Use stored credentials
+                    await gitPush(currentProject, {
+                      username: storedCredentials.username,
+                      password: storedCredentials.token
+                    });
+                  } else {
+                    // No stored credentials, try push without them
+                    await gitPush(currentProject);
+                  }
                   await loadGitStatus();
                   onRefresh();
                 } catch (error) {
                   console.error('Push failed:', error);
                   const msg = typeof error === 'string' ? error : ((error as any)?.message?.toString() ?? String(error ?? ''));
-                  // If auth error, prompt for credentials/PAT and retry once
+
+                  // If auth error and no stored credentials, prompt for credentials
                   if (/auth|denied|401|403|credentials/i.test(msg)) {
-                    const username = prompt('Enter Git username (for PAT, use "git" or your username):', 'git') || 'git';
-                    if (!username) return;
-                    const password = prompt('Enter Personal Access Token (will not be stored unless you choose to save it):', '') || '';
-                    if (!password) return;
-                    try {
-                      await gitPush(currentProject, { username, password });
-                      await loadGitStatus();
-                      onRefresh();
-                      // Offer to save the token securely for future pushes
-                      const save = confirm('Save this token securely in Windows Credential Manager for future pushes?');
-                      if (save) {
-                        try {
-                          const { saveGitCredentials } = await import('../tauri-api');
-                          await saveGitCredentials(currentProject, username, password);
-                          alert('Token saved securely. Future pushes will use it automatically.');
-                        } catch (saveErr) {
-                          console.error('Failed to save credentials:', saveErr);
-                          alert('Push succeeded, but failed to save credentials. You may be prompted again next time.');
+                    const storedCredentials = await getGitCredentials(currentProject);
+
+                    if (!storedCredentials) {
+                      const username = prompt('Enter Git username (for PAT, use "git" or your username):', 'git') || 'git';
+                      if (!username) return;
+                      const password = prompt('Enter Personal Access Token (will not be stored unless you choose to save it):', '') || '';
+                      if (!password) return;
+
+                      try {
+                        await gitPush(currentProject, { username, password });
+                        await loadGitStatus();
+                        onRefresh();
+
+                        // Offer to save the token securely for future pushes
+                        const save = confirm('Save this token securely in Windows Credential Manager for future pushes?\n\nNote: You can also save credentials permanently via Settings (⚙️ → Git Credentials)');
+                        if (save) {
+                          try {
+                            // We need the remote URL to save credentials properly
+                            alert('To save credentials with the remote URL, please use Settings (⚙️ → Git Credentials) instead.');
+                          } catch (saveErr) {
+                            console.error('Failed to save credentials:', saveErr);
+                            alert('Push succeeded, but failed to save credentials. You may be prompted again next time.');
+                          }
                         }
+                      } catch (e2) {
+                        const errorMsg2 = e2 instanceof Error ? e2.message : String(e2 ?? 'Unknown error');
+                        alert(`Push failed after authentication: ${errorMsg2}`);
                       }
-                    } catch (e2) {
-                      const errorMsg2 = e2 instanceof Error ? e2.message : String(e2 ?? 'Unknown error');
-                      alert(`Push failed after authentication: ${errorMsg2}`);
+                    } else {
+                      // We have stored credentials but they failed - they might be wrong
+                      alert(`Stored credentials failed. Please check your Git Credentials in Settings (⚙️ → Git Credentials) or try re-entering them.`);
                     }
                   } else {
                     const errorMsg = error instanceof Error ? error.message : String(error ?? 'Unknown error');

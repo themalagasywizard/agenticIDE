@@ -1,8 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
+import GitCredentialsDialog from './GitCredentialsDialog';
 
 interface TopBarProps {
   projectName: string;
   gitBranch?: string;
+  currentProject?: string;
   onOpenProject: () => void;
   onOpenRecentProjects: () => void;
   onToggleTheme: () => void;
@@ -15,6 +17,7 @@ interface TopBarProps {
 const TopBar: React.FC<TopBarProps> = ({
   projectName,
   gitBranch,
+  currentProject,
   onOpenProject,
   onOpenRecentProjects,
   onToggleTheme,
@@ -23,6 +26,7 @@ const TopBar: React.FC<TopBarProps> = ({
   onSaveProjectAs,
   hasUnsavedChanges
 }) => {
+  const [isGitDialogOpen, setIsGitDialogOpen] = useState(false);
   return (
     <div className="h-12 border-b border-border bg-card/95 backdrop-blur-sm flex items-center px-4 justify-between shadow-sm relative z-[10000]">
       <div className="flex items-center space-x-4">
@@ -105,13 +109,35 @@ const TopBar: React.FC<TopBarProps> = ({
           {isDarkMode ? '☀️' : '🌙'}
         </button>
 
-        <button
-          className="btn-modern btn-ghost p-2"
-          title="Settings"
-        >
-          ⚙️
-        </button>
+        <div className="relative group">
+          <button
+            className="btn-modern btn-ghost p-2"
+            title="Settings"
+          >
+            ⚙️
+          </button>
+          <div className="absolute top-full right-0 mt-1 bg-card border border-border rounded-md shadow-lg py-1 min-w-40 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-150 z-[10001]">
+            <button
+              onClick={() => setIsGitDialogOpen(true)}
+              className="w-full text-left px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground flex items-center space-x-2"
+            >
+              <span>🔑</span>
+              <span>Git Credentials</span>
+            </button>
+          </div>
+        </div>
       </div>
+
+      {/* Git Credentials Dialog */}
+      <GitCredentialsDialog
+        isOpen={isGitDialogOpen}
+        onClose={() => setIsGitDialogOpen(false)}
+        projectPath={currentProject || ''}
+        onCredentialsSaved={() => {
+          // Could add a callback to refresh git status if needed
+          console.log('Git credentials saved successfully');
+        }}
+      />
     </div>
   );
 };

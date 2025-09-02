@@ -35,8 +35,9 @@ pub fn run() {
       is_git_repository,
       git_push,
       git_pull,
-      save_git_credentials_cmd,
-      clear_git_credentials_cmd,
+      get_git_credentials,
+      set_git_credentials,
+      delete_git_credentials,
       list_directory,
       create_file,
       create_directory,
@@ -239,5 +240,36 @@ async fn write_file_content(file_path: String, content: String) -> Result<(), St
   match fs::write_file_content(Path::new(&file_path), &content) {
     Ok(_) => Ok(()),
     Err(e) => Err(format!("Failed to write file: {}", e)),
+  }
+}
+
+// Git Credentials Commands
+#[tauri::command]
+async fn get_git_credentials(project_path: String) -> Result<Option<git::GitCredentials>, String> {
+  match git::get_git_credentials(Path::new(&project_path)) {
+    Ok(credentials) => Ok(credentials),
+    Err(e) => Err(format!("Failed to get git credentials: {}", e)),
+  }
+}
+
+#[tauri::command]
+async fn set_git_credentials(project_path: String, username: String, token: String, remote_url: String) -> Result<(), String> {
+  let credentials = git::GitCredentials {
+    username,
+    token,
+    remote_url,
+  };
+
+  match git::set_git_credentials(Path::new(&project_path), credentials) {
+    Ok(_) => Ok(()),
+    Err(e) => Err(format!("Failed to set git credentials: {}", e)),
+  }
+}
+
+#[tauri::command]
+async fn delete_git_credentials(project_path: String) -> Result<(), String> {
+  match git::delete_git_credentials(Path::new(&project_path)) {
+    Ok(_) => Ok(()),
+    Err(e) => Err(format!("Failed to delete git credentials: {}", e)),
   }
 }

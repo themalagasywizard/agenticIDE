@@ -337,6 +337,7 @@ function App() {
       <TopBar
         projectName={currentProject.split('/').pop() || currentProject.split('\\').pop() || 'No Project'}
         gitBranch={gitBranch}
+        currentProject={currentProject}
         onOpenProject={openProject}
         onOpenRecentProjects={() => setIsRecentProjectsOpen(true)}
         onToggleTheme={toggleTheme}

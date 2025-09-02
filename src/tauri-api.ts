@@ -775,3 +775,66 @@ export const writeFileContent = async (filePath: string, content: string) => {
     return await fsWriteTextFile(filePath, content);
   }
 };
+
+// Git Credentials Functions
+export const getGitCredentials = async (projectPath: string) => {
+  console.log('🔑 Getting Git credentials for:', projectPath);
+
+  if (isTauri) {
+    try {
+      console.log('📞 Invoking get_git_credentials command');
+      const result = await invoke('get_git_credentials', { projectPath });
+      console.log('✅ Git credentials retrieved');
+      return result;
+    } catch (error) {
+      console.error('❌ Failed to get Git credentials:', error);
+      return null;
+    }
+  } else {
+    console.warn('⚠️ Not in Tauri environment, returning null');
+    return null;
+  }
+};
+
+export const setGitCredentials = async (projectPath: string, credentials: { username: string; token: string; remoteUrl: string }) => {
+  console.log('🔐 Setting Git credentials for:', projectPath);
+
+  if (isTauri) {
+    try {
+      console.log('📞 Invoking set_git_credentials command');
+      const result = await invoke('set_git_credentials', {
+        projectPath,
+        username: credentials.username,
+        token: credentials.token,
+        remoteUrl: credentials.remoteUrl
+      });
+      console.log('✅ Git credentials saved successfully');
+      return result;
+    } catch (error) {
+      console.error('❌ Failed to save Git credentials:', error);
+      throw error;
+    }
+  } else {
+    console.warn('⚠️ Not in Tauri environment, cannot save credentials');
+    throw new Error('Git credentials not available in development mode');
+  }
+};
+
+export const deleteGitCredentials = async (projectPath: string) => {
+  console.log('🗑️ Deleting Git credentials for:', projectPath);
+
+  if (isTauri) {
+    try {
+      console.log('📞 Invoking delete_git_credentials command');
+      const result = await invoke('delete_git_credentials', { projectPath });
+      console.log('✅ Git credentials deleted successfully');
+      return result;
+    } catch (error) {
+      console.error('❌ Failed to delete Git credentials:', error);
+      throw error;
+    }
+  } else {
+    console.warn('⚠️ Not in Tauri environment, cannot delete credentials');
+    throw new Error('Git credentials not available in development mode');
+  }
+};
