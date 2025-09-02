@@ -327,9 +327,19 @@ const FileTree: React.FC<FileTreeProps> = ({
   const [isConfigDialogOpen, setIsConfigDialogOpen] = useState(false);
   const [isInitializing, setIsInitializing] = useState(false);
   const [initialConfig, setInitialConfig] = useState<{ name: string | null; email: string | null }>({ name: null, email: null });
+  const [activeTab, setActiveTab] = useState<'files' | 'sourceControl'>('files');
+
+  // Sync external toggle with local tab state
+  useEffect(() => {
+    if (showGitPanel) {
+      setActiveTab('sourceControl');
+    } else {
+      setActiveTab('files');
+    }
+  }, [showGitPanel]);
 
   // Debug logging
-  console.log('FileTree rendering:', { currentProject, fileTree: fileTree.length });
+  console.log('FileTree rendering:', { currentProject, fileTree: fileTree.length, activeTab });
 
   // Load Git status when project changes
   useEffect(() => {
@@ -526,7 +536,7 @@ const FileTree: React.FC<FileTreeProps> = ({
           ⚠️ Using mock data - Run with "npm run tauri:dev" for real files
         </div>
       )}
-      
+
       {/* Project directory display */}
       {currentProject && (
         <div className="px-2 py-1 text-xs text-muted-foreground border-b border-border bg-muted/30">
@@ -534,123 +544,93 @@ const FileTree: React.FC<FileTreeProps> = ({
         </div>
       )}
 
-      {/* Git Panel - Source Control like Cursor */}
-      {currentGitStatus?.isGitRepo && (
-        <div className="border-b border-border">
-          {/* Source Control Header - always visible when Git repo */}
-          <div 
-            className="px-3 py-2 bg-muted/30 flex items-center justify-between cursor-pointer hover:bg-muted/50"
-            onClick={() => onGitPanelToggle?.(!showGitPanel)}
+      {/* Tabs header */}
+      <div className="px-2 py-1 border-b border-border bg-muted/30">
+        <div className="flex items-center space-x-2">
+          <button
+            className={`px-2 py-1 text-xs rounded ${activeTab === 'files' ? 'bg-accent text-accent-foreground' : 'hover:bg-accent/50'}`}
+            onClick={() => { setActiveTab('files'); onGitPanelToggle?.(false); }}
           >
-            <div className="flex items-center space-x-2">
-              <span className="text-sm font-medium">🔀 Source Control</span>
-              {totalChanges > 0 && (
-                <span className="text-xs bg-orange-500/20 text-orange-600 px-2 py-1 rounded">
-                  {totalChanges}
-                </span>
-              )}
-              <span className="text-xs bg-accent/50 px-2 py-1 rounded">
-                {currentGitStatus.branch}
-              </span>
-            </div>
-            <span className="text-xs text-muted-foreground">
-              {showGitPanel ? '▼' : '▶'}
-            </span>
+            📁 Files
+          </button>
+          <button
+            className={`px-2 py-1 text-xs rounded ${activeTab === 'sourceControl' ? 'bg-accent text-accent-foreground' : 'hover:bg-accent/50'}`}
+            onClick={() => { setActiveTab('sourceControl'); onGitPanelToggle?.(true); }}
+          >
+            🔀 Source Control {totalChanges > 0 ? <span className="ml-1 px-1 bg-orange-500/20 text-orange-600 rounded">{totalChanges}</span> : null}
+          </button>
+        </div>
+      </div>
+
+      {/* Content area */}
+      <div className="flex-1 overflow-hidden flex flex-col">
+        {activeTab === 'files' && (
+          <div className="flex-1 overflow-hidden">
+            <FilesTab />
           </div>
-          
-          {/* Expanded Git Panel */}
-          {showGitPanel && (
-            <div className="flex flex-col max-h-80">
-              {/* Git Changes Section */}
-              {totalChanges > 0 ? (
-                <div className="max-h-40 overflow-y-auto border-b border-border">
-                  <GitChanges 
+        )}
+
+        {activeTab === 'sourceControl' && (
+          <div className="flex-1 flex flex-col overflow-hidden">
+            {/* Not a git repo -> initialize flow */}
+            {!currentGitStatus?.isGitRepo ? (
+              <div className="px-3 py-2 bg-muted/30 border-b border-border">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">📁 No Git Repository</span>
+                  <button
+                    onClick={async () => {
+                      if (isInitializing) return;
+                      setIsInitializing(true);
+                      try {
+                        console.log('🔧 Starting enhanced Git initialization...');
+                        const result = await initGitRepoEnhanced(currentProject);
+                        console.log('✅ Git initialization result:', result);
+                        if (result.success) {
+                          try {
+                            const cfg: any = await getGitConfig(currentProject);
+                            setInitialConfig({ name: cfg.user_name ?? null, email: cfg.user_email ?? null });
+                          } catch (e) {
+                            console.warn('Could not prefetch git config:', e);
+                            setInitialConfig({ name: null, email: null });
+                          }
+                          setIsConfigDialogOpen(true);
+                          await loadGitStatus();
+                          onRefresh();
+                        } else {
+                          alert(`Failed to initialize Git repository: ${result.message}`);
+                        }
+                      } catch (error) {
+                        console.error('Failed to initialize Git repository:', error);
+                        alert(`Failed to initialize Git repository: ${error}`);
+                      } finally {
+                        setIsInitializing(false);
+                      }
+                    }}
+                    disabled={isInitializing}
+                    className="text-xs px-2 py-1 bg-primary text-primary-foreground rounded hover:bg-primary/90 disabled:opacity-50"
+                  >
+                    {isInitializing ? '⏳ Initializing...' : '🔧 Initialize Git'}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              // Git repo view: top changes, bottom history
+              <>
+                <div className="flex-1 overflow-y-auto border-b border-border">
+                  <GitChanges
                     currentProject={currentProject}
                     onFileClick={onFileClick}
-                    onRefresh={() => {
-                      loadGitStatus();
-                      onRefresh();
-                    }}
-                    compact={true}
+                    onRefresh={() => { loadGitStatus(); onRefresh(); }}
+                    compact={false}
                   />
                 </div>
-              ) : (
-                <div className="p-3 text-center text-muted-foreground border-b border-border">
-                  <div className="text-sm">✅ No changes</div>
-                  <div className="text-xs mt-1">Working tree clean</div>
+                <div className="h-48 overflow-hidden">
+                  <GitHistory currentProject={currentProject} gitBranch={currentGitStatus.branch} compact={true} />
                 </div>
-              )}
-              
-              {/* Git History Section */}
-              <div className="max-h-40 overflow-hidden">
-                <GitHistory 
-                  currentProject={currentProject}
-                  gitBranch={currentGitStatus.branch}
-                  compact={true}
-                />
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Git Status Bar for non-git or no changes */}
-      {currentProject && !currentGitStatus?.isGitRepo && (
-        <div className="px-3 py-2 bg-muted/30 border-b border-border">
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-muted-foreground">
-              📁 No Git Repository
-            </span>
-            <button
-              onClick={async () => {
-                if (isInitializing) return;
-                
-                setIsInitializing(true);
-                try {
-                  console.log('🔧 Starting enhanced Git initialization...');
-                  const result = await initGitRepoEnhanced(currentProject);
-                  console.log('✅ Git initialization result:', result);
-                  
-                  if (result.success) {
-                    // Prefetch current git config (global/local) to prefill dialog
-                    try {
-                      const cfg: any = await getGitConfig(currentProject);
-                      setInitialConfig({ name: cfg.user_name ?? null, email: cfg.user_email ?? null });
-                    } catch (e) {
-                      console.warn('Could not prefetch git config:', e);
-                      setInitialConfig({ name: null, email: null });
-                    }
-
-                    // Always open professional setup after init
-                    setIsConfigDialogOpen(true);
-
-                    // Refresh status and open panel
-                    await loadGitStatus();
-                    onRefresh();
-                    onGitPanelToggle?.(true);
-                  } else {
-                    console.error('Git initialization failed:', result.message);
-                    alert(`Failed to initialize Git repository: ${result.message}`);
-                  }
-                } catch (error) {
-                  console.error('Failed to initialize Git repository:', error);
-                  alert(`Failed to initialize Git repository: ${error}`);
-                } finally {
-                  setIsInitializing(false);
-                }
-              }}
-              disabled={isInitializing}
-              className="text-xs px-2 py-1 bg-primary text-primary-foreground rounded hover:bg-primary/90 disabled:opacity-50"
-            >
-              {isInitializing ? '⏳ Initializing...' : '🔧 Initialize Git'}
-            </button>
+              </>
+            )}
           </div>
-        </div>
-      )}
-
-      {/* File Tree */}
-      <div className="flex-1 overflow-hidden">
-        <FilesTab />
+        )}
       </div>
 
       {/* Git Configuration Dialog */}
@@ -658,12 +638,7 @@ const FileTree: React.FC<FileTreeProps> = ({
         isOpen={isConfigDialogOpen}
         onClose={() => setIsConfigDialogOpen(false)}
         projectPath={currentProject}
-        onConfigComplete={async () => {
-          // Configuration is complete, refresh Git status and show panel
-          await loadGitStatus();
-          onRefresh();
-          onGitPanelToggle?.(true);
-        }}
+        onConfigComplete={async () => { await loadGitStatus(); onRefresh(); }}
         initialName={initialConfig.name}
         initialEmail={initialConfig.email}
       />
