@@ -2,7 +2,6 @@ mod git;
 mod fs;
 
 use std::path::Path;
-use std::sync::Mutex;
 use git::{GitManager, GitStatus};
 use fs::FileItem;
 

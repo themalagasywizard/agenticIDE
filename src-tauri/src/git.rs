@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::path::Path;
 use std::fs;
 use anyhow::{Result, anyhow};
+use git2::{BranchType};
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct GitStatus {
@@ -243,11 +244,14 @@ impl GitManager {
         let repo = self.repo.as_ref().ok_or_else(|| anyhow!("Not a git repository"))?;
 
         // Find the remote
-        let mut remote = repo.find_remote(remote_name)?;
+        let mut remote = match repo.find_remote(remote_name) {
+            Ok(r) => r,
+            Err(_) => return Err(anyhow!(format!("RemoteNotFound:{}", remote_name))),
+        };
 
         // Set up callbacks for authentication (support SSH agent, HTTPS with user/pass or PAT, and default creds)
         let mut callbacks = RemoteCallbacks::new();
-        callbacks.credentials(move |url, username_from_url, allowed_types| {
+        callbacks.credentials(move |_url, username_from_url, allowed_types| {
             // If caller provided username/password (or token), prefer that for HTTPS
             if allowed_types.is_user_pass_plaintext() {
                 if let (Some(u), Some(p)) = (username, password) {
@@ -273,7 +277,15 @@ impl GitManager {
 
         // Push the branch
         let refspec = format!("refs/heads/{}:refs/heads/{}", branch_name, branch_name);
-        remote.push(&[&refspec], Some(&mut push_options))?;
+        if let Err(e) = remote.push(&[&refspec], Some(&mut push_options)) {
+            return Err(anyhow!(format!("PushFailed:{}", e.message())));
+        }
+
+        // Try to set upstream if not set yet
+        if let Ok(mut branch) = repo.find_branch(branch_name, BranchType::Local) {
+            let upstream_ref = format!("{}/{}", remote_name, branch_name);
+            let _ = branch.set_upstream(Some(&upstream_ref)); // ignore error if already set
+        }
 
         Ok(())
     }
@@ -486,6 +498,22 @@ pids
 tmp/
 temp/
 ".to_string()
+}
+
+/// Configure or update a remote URL
+pub fn set_remote(repo_path: &Path, remote_name: &str, url: &str) -> Result<()> {
+    let repo = Repository::open(repo_path)?;
+
+    // Check if remote exists first, without borrowing the Remote
+    let remote_exists = repo.find_remote(remote_name).is_ok();
+
+    if remote_exists {
+        repo.remote_set_url(remote_name, url)?;
+    } else {
+        repo.remote(remote_name, url)?;
+    }
+
+    Ok(())
 }
 
 /// Legacy function for backward compatibility

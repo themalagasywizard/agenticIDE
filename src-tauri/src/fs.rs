@@ -1,10 +1,8 @@
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use serde::{Deserialize, Serialize};
-use walkdir::WalkDir;
 use notify::{Watcher, RecursiveMode, recommended_watcher};
 use std::sync::mpsc::channel;
-use std::time::Duration;
 use anyhow::Result;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -36,7 +34,7 @@ impl FileWatcher {
     {
         let (tx, rx) = channel();
 
-        let mut watcher = recommended_watcher(move |res| {
+        let watcher = recommended_watcher(move |res| {
             match res {
                 Ok(event) => {
                     let _ = tx.send(event);
