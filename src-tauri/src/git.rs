@@ -19,6 +19,9 @@ pub struct GitCommit {
     pub message: String,
     pub author: String,
     pub timestamp: i64,
+    // Flags to help UI color commits based on local vs remote
+    pub is_on_head: bool,
+    pub is_on_upstream: bool,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -133,6 +136,8 @@ impl GitManager {
         let repo = self.repo.as_ref().ok_or_else(|| anyhow!("Not a git repository"))?;
 
         let mut index = repo.index()?;
+        // Ensure index is written to disk before creating tree
+        index.write()?;
         let tree_id = index.write_tree()?;
         let tree = repo.find_tree(tree_id)?;
 
@@ -142,7 +147,8 @@ impl GitManager {
         let commit_id = match repo.head() {
             Ok(head) => {
                 // Regular commit with parent
-                let parent = repo.find_commit(head.target().unwrap())?;
+                let target = head.target().ok_or_else(|| anyhow!("HEAD has no target"))?;
+                let parent = repo.find_commit(target)?;
                 repo.commit(
                     Some("HEAD"),
                     &sig,
@@ -155,14 +161,19 @@ impl GitManager {
             Err(e) => {
                 // Initial commit (no parent) - check if it's an unborn branch
                 if e.code() == ErrorCode::UnbornBranch {
-                    repo.commit(
-                        Some("HEAD"),
+                    // Prefer 'main' as default branch reference
+                    let head_ref = "refs/heads/main";
+                    let id = repo.commit(
+                        Some(head_ref),
                         &sig,
                         &sig,
                         message,
                         &tree,
-                        &[], // No parents for initial commit
-                    )?
+                        &[],
+                    )?;
+                    // Point HEAD to the new branch explicitly
+                    repo.set_head(head_ref)?;
+                    id
                 } else {
                     return Err(e.into());
                 }
@@ -179,7 +190,24 @@ impl GitManager {
         let mut commits = Vec::new();
         
         match repo.head() {
-            Ok(_) => {
+            Ok(head_ref) => {
+                // Determine upstream of current branch if it exists
+                let mut upstream_set = std::collections::HashSet::new();
+                if let Ok(head_name) = head_ref.shorthand().ok_or_else(|| anyhow!("Invalid HEAD")) {
+                    let branch_name = head_name.to_string();
+                    let upstream_refname = format!("refs/remotes/origin/{}", branch_name);
+                    if let Ok(up_ref) = repo.find_reference(&upstream_refname) {
+                        if let Some(up_oid) = up_ref.target() {
+                            // Walk remote branch to collect oids (limit to some reasonable size)
+                            let mut upwalk = repo.revwalk()?;
+                            upwalk.push(up_oid)?;
+                            for oid_res in upwalk.take(1000) {
+                                if let Ok(oid) = oid_res { upstream_set.insert(oid); }
+                            }
+                        }
+                    }
+                }
+
                 // We have commits, proceed normally
                 let mut revwalk = repo.revwalk()?;
                 revwalk.push_head()?;
@@ -193,6 +221,8 @@ impl GitManager {
                         message: commit.message().unwrap_or("").to_string(),
                         author: commit.author().name().unwrap_or("Unknown").to_string(),
                         timestamp: commit.time().seconds(),
+                        is_on_head: true,
+                        is_on_upstream: upstream_set.contains(&oid),
                     });
                 }
             }
@@ -209,16 +239,32 @@ impl GitManager {
         Ok(commits)
     }
 
-    pub fn push(&self, remote_name: &str, branch_name: &str) -> Result<()> {
+    pub fn push(&self, remote_name: &str, branch_name: &str, username: Option<&str>, password: Option<&str>) -> Result<()> {
         let repo = self.repo.as_ref().ok_or_else(|| anyhow!("Not a git repository"))?;
 
         // Find the remote
         let mut remote = repo.find_remote(remote_name)?;
 
-        // Set up callbacks for authentication (simplified for now)
+        // Set up callbacks for authentication (support SSH agent, HTTPS with user/pass or PAT, and default creds)
         let mut callbacks = RemoteCallbacks::new();
-        callbacks.credentials(|_url, username_from_url, _allowed_types| {
-            Cred::ssh_key_from_agent(username_from_url.unwrap_or("git"))
+        callbacks.credentials(move |url, username_from_url, allowed_types| {
+            // If caller provided username/password (or token), prefer that for HTTPS
+            if allowed_types.is_user_pass_plaintext() {
+                if let (Some(u), Some(p)) = (username, password) {
+                    return Cred::userpass_plaintext(u, p);
+                }
+            }
+            // Try SSH agent if allowed
+            if allowed_types.is_ssh_key() {
+                if let Some(u) = username_from_url {
+                    if let Ok(cred) = Cred::ssh_key_from_agent(u) { return Ok(cred); }
+                }
+                if let Some(u) = username {
+                    if let Ok(cred) = Cred::ssh_key_from_agent(u) { return Ok(cred); }
+                }
+            }
+            // Fallback to default credentials (may use OS helpers)
+            Cred::default()
         });
 
         // Set up push options

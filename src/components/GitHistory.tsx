@@ -6,6 +6,8 @@ interface GitCommit {
   message: string;
   author: string;
   timestamp: number;
+  is_on_head?: boolean;
+  is_on_upstream?: boolean;
 }
 
 interface GitHistoryProps {
@@ -97,6 +99,15 @@ const GitHistory: React.FC<GitHistoryProps> = ({
         </div>
       )}
 
+      {/* Legend (non-compact) */}
+      {!compact && (
+        <div className="px-3 py-2 text-xs text-muted-foreground border-b border-border flex items-center space-x-3">
+          <span className="flex items-center space-x-1"><span className="w-2 h-2 bg-green-500 inline-block rounded-full"></span><span>main</span></span>
+          <span className="flex items-center space-x-1"><span className="w-2 h-2 bg-blue-500 inline-block rounded-full"></span><span>origin/main</span></span>
+          <span className="flex items-center space-x-1"><span className="w-2 h-2 bg-purple-500 inline-block rounded-full"></span><span>both</span></span>
+        </div>
+      )}
+
       {/* Commits List */}
       <div className={compact ? 'overflow-y-auto max-h-32' : 'flex-1 overflow-y-auto'}>
         {loading ? (
@@ -120,33 +131,43 @@ const GitHistory: React.FC<GitHistoryProps> = ({
             <div className="text-xs mt-1">Make your first commit to see history</div>
           </div>
         ) : (
-          commits.map((commit) => (
-            <div
-              key={commit.hash}
-              className="px-3 py-2 hover:bg-accent/30 cursor-pointer border-l-2 border-transparent hover:border-primary/50"
-              title={commit.message}
-            >
-              <div className="flex items-start space-x-2">
-                <div className="w-2 h-2 bg-primary rounded-full mt-1.5 flex-shrink-0"></div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium text-foreground truncate">
-                    {truncateMessage(commit.message)}
-                  </div>
-                  <div className="flex items-center justify-between mt-1">
-                    <div className="text-xs text-muted-foreground truncate">
-                      {commit.author}
+          commits.map((commit) => {
+            const onHead = !!commit.is_on_head;
+            const onUp = !!commit.is_on_upstream;
+            const dotColor = onHead && onUp ? 'bg-purple-500' : onHead ? 'bg-green-500' : onUp ? 'bg-blue-500' : 'bg-muted-foreground';
+            const borderColor = onHead && onUp ? 'border-purple-400' : onHead ? 'border-green-400' : onUp ? 'border-blue-400' : 'border-transparent';
+            return (
+              <div
+                key={commit.hash}
+                className={`px-3 py-2 hover:bg-accent/30 cursor-pointer border-l-2 ${borderColor}`}
+                title={commit.message}
+              >
+                <div className="flex items-start space-x-2">
+                  <div className={`w-2 h-2 ${dotColor} rounded-full mt-1.5 flex-shrink-0`}></div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium text-foreground truncate">
+                      {truncateMessage(commit.message)}
                     </div>
-                    <div className="text-xs text-muted-foreground flex-shrink-0 ml-2">
-                      {formatDate(commit.timestamp)}
+                    <div className="flex items-center justify-between mt-1">
+                      <div className="text-xs text-muted-foreground truncate">
+                        {commit.author}
+                      </div>
+                      <div className="text-xs text-muted-foreground flex-shrink-0 ml-2">
+                        {formatDate(commit.timestamp)}
+                      </div>
                     </div>
-                  </div>
-                  <div className="text-xs text-muted-foreground mt-1 font-mono">
-                    {commit.hash}
+                    <div className="flex items-center justify-between mt-1">
+                      <div className="text-xs text-muted-foreground font-mono">{commit.hash}</div>
+                      <div className="text-xs space-x-1">
+                        {onHead && <span className="px-1 rounded bg-green-500/20 text-green-700">main</span>}
+                        {onUp && <span className="px-1 rounded bg-blue-500/20 text-blue-700">origin/main</span>}
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
 

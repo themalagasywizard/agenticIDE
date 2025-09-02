@@ -94,6 +94,34 @@ const GitChanges: React.FC<GitChangesProps> = ({
     }
   };
 
+  const handleCommitAll = async () => {
+    if (!commitMessage.trim()) {
+      alert('Please enter a commit message');
+      return;
+    }
+
+    setIsCommitting(true);
+    try {
+      // Stage all modified and untracked files first
+      const toStage = [...(gitStatus?.modified || []), ...(gitStatus?.untracked || [])];
+      for (const file of toStage) {
+        try { await stageFile(currentProject, file); } catch (e) { console.warn('Failed to stage', file, e); }
+      }
+      // Refresh status before commit (optional but safer)
+      await loadGitStatus();
+      // Commit
+      await commitChanges(currentProject, commitMessage.trim());
+      setCommitMessage('');
+      await loadGitStatus();
+      onRefresh();
+    } catch (error) {
+      console.error('Failed to commit all changes:', error);
+      alert('Failed to commit all changes');
+    } finally {
+      setIsCommitting(false);
+    }
+  };
+
   const handleInitGit = async () => {
     setIsInitializing(true);
     try {
@@ -190,8 +218,8 @@ const GitChanges: React.FC<GitChangesProps> = ({
         </div>
       )}
 
-      {/* Commit Message Input - simplified in compact mode */}
-      {gitStatus.staged.length > 0 && (
+      {/* Commit Message Input - when any changes exist */}
+      {totalChanges > 0 && (
         <div className={compact ? "p-2 border-b border-border" : "p-3 border-b border-border"}>
           <textarea
             value={commitMessage}
@@ -202,21 +230,37 @@ const GitChanges: React.FC<GitChangesProps> = ({
             onKeyDown={(e) => {
               if (e.ctrlKey && e.key === 'Enter') {
                 e.preventDefault();
-                handleCommit();
+                // If staged exist, commit staged; otherwise stage all and commit
+                if (gitStatus.staged.length > 0) {
+                  handleCommit();
+                } else {
+                  handleCommitAll();
+                }
               }
             }}
           />
           <div className="flex items-center justify-between mt-2">
             <span className="text-xs text-muted-foreground">
-              {gitStatus.staged.length} staged change{gitStatus.staged.length !== 1 ? 's' : ''}
+              {gitStatus.staged.length} staged • {gitStatus.modified.length + gitStatus.untracked.length} pending
             </span>
-            <button
-              onClick={handleCommit}
-              disabled={isCommitting || !commitMessage.trim()}
-              className="px-3 py-1 text-xs bg-primary text-primary-foreground rounded hover:bg-primary/90 disabled:opacity-50"
-            >
-              {isCommitting ? 'Committing...' : 'Commit'}
-            </button>
+            <div className="flex items-center space-x-2">
+              {gitStatus.staged.length > 0 && (
+                <button
+                  onClick={handleCommit}
+                  disabled={isCommitting || !commitMessage.trim()}
+                  className="px-3 py-1 text-xs bg-primary text-primary-foreground rounded hover:bg-primary/90 disabled:opacity-50"
+                >
+                  {isCommitting ? 'Committing...' : 'Commit staged'}
+                </button>
+              )}
+              <button
+                onClick={handleCommitAll}
+                disabled={isCommitting || !commitMessage.trim()}
+                className="px-3 py-1 text-xs bg-primary text-primary-foreground rounded hover:bg-primary/90 disabled:opacity-50"
+              >
+                {isCommitting ? 'Committing...' : 'Commit all'}
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -357,7 +401,6 @@ const GitChanges: React.FC<GitChangesProps> = ({
                   onRefresh();
                 } catch (error) {
                   console.error('Pull failed:', error);
-                  // Show user-friendly error message
                   const errorMsg = error instanceof Error ? error.message : 'Unknown error';
                   alert(`Pull failed: ${errorMsg}`);
                 }
@@ -375,9 +418,25 @@ const GitChanges: React.FC<GitChangesProps> = ({
                   onRefresh();
                 } catch (error) {
                   console.error('Push failed:', error);
-                  // Show user-friendly error message
-                  const errorMsg = error instanceof Error ? error.message : 'Unknown error';
-                  alert(`Push failed: ${errorMsg}`);
+                  const msg = (error as any)?.message?.toString() || '';
+                  // If auth error, prompt for credentials/PAT and retry once
+                  if (/auth|denied|401|403|credentials/i.test(msg)) {
+                    const username = prompt('Enter Git username (for PAT, use "git" or your username):', 'git') || 'git';
+                    if (!username) return;
+                    const password = prompt('Enter Personal Access Token (will not be stored):', '') || '';
+                    if (!password) return;
+                    try {
+                      await gitPush(currentProject, { username, password });
+                      await loadGitStatus();
+                      onRefresh();
+                    } catch (e2) {
+                      const errorMsg2 = e2 instanceof Error ? e2.message : 'Unknown error';
+                      alert(`Push failed after authentication: ${errorMsg2}`);
+                    }
+                  } else {
+                    const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+                    alert(`Push failed: ${errorMsg}`);
+                  }
                 }
               }}
               className="flex-1 px-3 py-1 text-xs bg-accent hover:bg-accent/80 rounded"

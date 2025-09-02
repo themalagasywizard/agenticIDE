@@ -133,12 +133,12 @@ async fn is_git_repository(project_path: String) -> Result<bool, String> {
 }
 
 #[tauri::command]
-async fn git_push(project_path: String, remote_name: Option<String>, branch_name: Option<String>) -> Result<(), String> {
+async fn git_push(project_path: String, remote_name: Option<String>, branch_name: Option<String>, username: Option<String>, password: Option<String>) -> Result<(), String> {
   let remote = remote_name.unwrap_or_else(|| "origin".to_string());
   let branch = branch_name.unwrap_or_else(|| "main".to_string());
   
   let git_manager = GitManager::new(Path::new(&project_path));
-  match git_manager.push(&remote, &branch) {
+  match git_manager.push(&remote, &branch, username.as_deref(), password.as_deref()) {
     Ok(_) => Ok(()),
     Err(e) => Err(format!("Failed to push: {}", e)),
   }

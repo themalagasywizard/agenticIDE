@@ -328,6 +328,7 @@ const FileTree: React.FC<FileTreeProps> = ({
   const [isInitializing, setIsInitializing] = useState(false);
   const [initialConfig, setInitialConfig] = useState<{ name: string | null; email: string | null }>({ name: null, email: null });
   const [activeTab, setActiveTab] = useState<'files' | 'sourceControl'>('files');
+  const [historyHeight, setHistoryHeight] = useState<number>(192);
 
   // Sync external toggle with local tab state
   useEffect(() => {
@@ -624,7 +625,26 @@ const FileTree: React.FC<FileTreeProps> = ({
                     compact={false}
                   />
                 </div>
-                <div className="h-48 overflow-hidden">
+                {/* Resizer for history panel */}
+                <div
+                  className="h-1 bg-border hover:bg-accent cursor-row-resize"
+                  onMouseDown={(e) => {
+                    const startY = e.clientY;
+                    const startHeight = historyHeight;
+                    const onMove = (ev: MouseEvent) => {
+                      const delta = ev.clientY - startY;
+                      const newH = Math.min(400, Math.max(120, startHeight + delta));
+                      setHistoryHeight(newH);
+                    };
+                    const onUp = () => {
+                      document.removeEventListener('mousemove', onMove);
+                      document.removeEventListener('mouseup', onUp);
+                    };
+                    document.addEventListener('mousemove', onMove);
+                    document.addEventListener('mouseup', onUp);
+                  }}
+                />
+                <div className="overflow-hidden" style={{ height: historyHeight }}>
                   <GitHistory currentProject={currentProject} gitBranch={currentGitStatus.branch} compact={true} />
                 </div>
               </>

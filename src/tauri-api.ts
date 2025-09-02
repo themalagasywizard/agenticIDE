@@ -606,8 +606,10 @@ export const isGitRepository = async (projectPath: string) => {
 };
 
 // Git Push/Pull operations
-export const gitPush = async (projectPath: string, remoteName = 'origin', branchName = 'main') => {
-  console.log('⬆️ Pushing to remote:', { projectPath, remoteName, branchName });
+export const gitPush = async (projectPath: string, options?: { remoteName?: string; branchName?: string; username?: string; password?: string; }) => {
+  const remoteName = options?.remoteName ?? 'origin';
+  const branchName = options?.branchName ?? 'main';
+  console.log('⬆️ Pushing to remote:', { projectPath, remoteName, branchName, withCredentials: Boolean(options?.password) });
   
   if (isTauri) {
     try {
@@ -615,7 +617,9 @@ export const gitPush = async (projectPath: string, remoteName = 'origin', branch
       const result = await invoke('git_push', { 
         projectPath, 
         remoteName: remoteName === 'origin' ? null : remoteName,
-        branchName: branchName === 'main' ? null : branchName 
+        branchName: branchName === 'main' ? null : branchName,
+        username: options?.username ?? null,
+        password: options?.password ?? null,
       });
       console.log('✅ Push completed successfully');
       return result;
