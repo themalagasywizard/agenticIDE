@@ -1,4 +1,5 @@
 import React from 'react';
+import { Sun, Moon, PanelLeft, PanelBottom, Settings } from 'lucide-react';
 
 interface TopBarProps {
   projectName: string;
@@ -109,31 +110,39 @@ const TopBar: React.FC<TopBarProps> = ({
           onClick={onToggleTheme}
           className="btn-modern btn-ghost p-2"
           title="Toggle Theme"
+          aria-label="Toggle Theme"
         >
-          {isDarkMode ? '☀️' : '🌙'}
+          {isDarkMode ? (
+            <Sun className="h-5 w-5" />
+          ) : (
+            <Moon className="h-5 w-5" />
+          )}
         </button>
 
         <button
           onClick={onToggleSidebar}
           className="btn-modern btn-ghost p-2"
           title={showSidebar ? 'Hide Left Panel' : 'Show Left Panel'}
+          aria-label={showSidebar ? 'Hide Left Panel' : 'Show Left Panel'}
         >
-          📁
+          <PanelLeft className="h-5 w-5" />
         </button>
 
         <button
           onClick={onToggleTerminal}
           className="btn-modern btn-ghost p-2"
           title={showTerminal ? 'Hide Terminal' : 'Show Terminal'}
+          aria-label={showTerminal ? 'Hide Terminal' : 'Show Terminal'}
         >
-          🖥️
+          <PanelBottom className="h-5 w-5" />
         </button>
 
         <button
           className="btn-modern btn-ghost p-2"
           title="Settings"
+          aria-label="Settings"
         >
-          ⚙️
+          <Settings className="h-5 w-5" />
         </button>
       </div>
     </div>
