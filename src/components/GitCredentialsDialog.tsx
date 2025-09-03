@@ -131,9 +131,19 @@ const GitCredentialsDialog: React.FC<GitCredentialsDialogProps> = ({
 
   if (!isOpen) return null;
 
+  const handleBackdropClick = (e: React.MouseEvent) => {
+    if (e.target === e.currentTarget) {
+      onClose();
+    }
+  };
+
   return (
-    <div className="fixed top-0 left-0 right-0 bottom-50 z-[10004] flex items-center justify-center">
-      <div className="bg-card border border-border rounded-lg shadow-xl w-full max-w-md max-h-[80vh] overflow-y-auto mx-4">
+    <div className="fixed inset-0 z-[10004] flex items-center justify-center" onClick={handleBackdropClick}>
+      {/* Backdrop */}
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm"></div>
+
+      {/* Dialog positioned in editor area */}
+      <div className="relative bg-card border border-border rounded-lg shadow-2xl w-full max-w-md max-h-[80vh] overflow-y-auto mx-4" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div className="px-6 py-4 border-b border-border">
           <h2 className="text-lg font-semibold text-foreground">Git Credentials</h2>

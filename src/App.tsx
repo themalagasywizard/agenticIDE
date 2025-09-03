@@ -7,6 +7,8 @@ import Terminal from './components/Terminal';
 import FileSearch from './components/FileSearch';
 import RecentProjects, { addRecentProject } from './components/RecentProjects';
 import GitCommitDialog from './components/GitCommitDialog';
+import GitCredentialsDialog from './components/GitCredentialsDialog';
+import AIPanel from './components/AIPanel';
 import './styles.css';
 
 interface FileItem {
@@ -29,9 +31,11 @@ function App() {
   const [isFileSearchOpen, setIsFileSearchOpen] = useState<boolean>(false);
   const [isRecentProjectsOpen, setIsRecentProjectsOpen] = useState<boolean>(false);
   const [isCommitDialogOpen, setIsCommitDialogOpen] = useState<boolean>(false);
+  const [isGitCredentialsOpen, setIsGitCredentialsOpen] = useState<boolean>(false);
   const [gitStatus, setGitStatus] = useState<any>(null);
   const [gitBranch, setGitBranch] = useState<string>('');
   const [showGitPanel, setShowGitPanel] = useState<boolean>(false);
+  const [showAI, setShowAI] = useState<boolean>(false);
 
   // Apply theme
   useEffect(() => {
@@ -350,6 +354,13 @@ function App() {
         onToggleTerminal={() => setShowTerminal((t) => !t)}
         showSidebar={showSidebar}
         showTerminal={showTerminal}
+        onOpenGitCredentials={() => setIsGitCredentialsOpen(true)}
+        onOpenSettings={() => {
+          // TODO: Implement general settings dialog
+          console.log('General settings not yet implemented');
+        }}
+        onToggleAI={() => setShowAI((s) => !s)}
+        showAI={showAI}
       />
 
       <div className="flex flex-1 overflow-hidden">
@@ -477,6 +488,28 @@ function App() {
           onCommitComplete={handleCommitComplete}
         />
       )}
+
+      {/* Git Credentials Dialog */}
+      {currentProject && (
+        <GitCredentialsDialog
+          isOpen={isGitCredentialsOpen}
+          onClose={() => setIsGitCredentialsOpen(false)}
+          projectPath={currentProject}
+          onCredentialsSaved={() => {
+            // Refresh Git status after credentials are saved
+            if (currentProject) {
+              detectGitStatus(currentProject);
+            }
+          }}
+        />
+      )}
+
+      {/* AI Panel */}
+      <AIPanel
+        isOpen={showAI}
+        onClose={() => setShowAI(false)}
+        onToggle={() => setShowAI((s) => !s)}
+      />
     </div>
   );
 }

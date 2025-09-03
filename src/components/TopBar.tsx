@@ -1,5 +1,5 @@
-import React from 'react';
-import { Sun, Moon, PanelLeft, PanelBottom, Settings } from 'lucide-react';
+import React, { useState } from 'react';
+import { Sun, Moon, PanelLeft, PanelBottom, Settings, Key, Bot } from 'lucide-react';
 
 interface TopBarProps {
   projectName: string;
@@ -15,6 +15,10 @@ interface TopBarProps {
   onToggleTerminal: () => void;
   showSidebar: boolean;
   showTerminal: boolean;
+  onOpenGitCredentials: () => void;
+  onOpenSettings: () => void;
+  onToggleAI: () => void;
+  showAI: boolean;
 }
 
 const TopBar: React.FC<TopBarProps> = ({
@@ -31,7 +35,12 @@ const TopBar: React.FC<TopBarProps> = ({
   onToggleTerminal,
   showSidebar,
   showTerminal,
+  onOpenGitCredentials,
+  onOpenSettings,
+  onToggleAI,
+  showAI,
 }) => {
+  const [showSettingsMenu, setShowSettingsMenu] = useState(false);
   return (
     <div className="h-12 border-b border-border bg-card/95 backdrop-blur-sm flex items-center px-4 justify-between shadow-sm relative z-[10000]">
       <div className="flex items-center space-x-4">
@@ -138,12 +147,47 @@ const TopBar: React.FC<TopBarProps> = ({
         </button>
 
         <button
-          className="btn-modern btn-ghost p-2"
-          title="Settings"
-          aria-label="Settings"
+          onClick={onToggleAI}
+          className={`btn-modern btn-ghost p-2 ${showAI ? 'bg-accent' : ''}`}
+          title={showAI ? 'Hide AI Panel' : 'Show AI Panel'}
+          aria-label={showAI ? 'Hide AI Panel' : 'Show AI Panel'}
         >
-          <Settings className="h-5 w-5" />
+          <Bot className="h-5 w-5" />
         </button>
+
+        {/* Settings Menu */}
+        <div className="relative group">
+          <button
+            className="btn-modern btn-ghost p-2"
+            title="Settings"
+            aria-label="Settings"
+            onClick={() => setShowSettingsMenu(!showSettingsMenu)}
+          >
+            <Settings className="h-5 w-5" />
+          </button>
+          <div className={`absolute top-full right-0 mt-1 bg-card border border-border rounded-md shadow-lg py-1 min-w-48 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-150 z-[10001] ${showSettingsMenu ? 'opacity-100 visible' : ''}`}>
+            <button
+              onClick={() => {
+                onOpenGitCredentials();
+                setShowSettingsMenu(false);
+              }}
+              className="w-full text-left px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground flex items-center space-x-2"
+            >
+              <Key className="h-4 w-4" />
+              <span>Git Credentials</span>
+            </button>
+            <div className="border-t border-border my-1"></div>
+            <button
+              onClick={() => {
+                onOpenSettings();
+                setShowSettingsMenu(false);
+              }}
+              className="w-full text-left px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground"
+            >
+              General Settings
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );
