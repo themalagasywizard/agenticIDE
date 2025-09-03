@@ -200,24 +200,6 @@ const GitChanges: React.FC<GitChangesProps> = ({
 
   return (
     <div className={compact ? "flex flex-col" : "h-full flex flex-col"}>
-      {/* Header - only in non-compact mode */}
-      {!compact && (
-        <div className="px-3 py-2 border-b border-border bg-muted/30">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-foreground">Source Control</h3>
-            <div className="flex items-center space-x-2">
-              <span className="text-xs bg-accent/50 px-2 py-1 rounded">
-                {gitStatus.branch}
-              </span>
-              {totalChanges > 0 && (
-                <span className="text-xs bg-orange-500/20 text-orange-600 px-2 py-1 rounded">
-                  {totalChanges}
-                </span>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Commit Message Input - when any changes exist */}
       {totalChanges > 0 && (

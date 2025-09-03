@@ -24,6 +24,8 @@ function App() {
   const [isDarkMode, setIsDarkMode] = useState<boolean>(true);
   const [sidebarWidth, setSidebarWidth] = useState<number>(250);
   const [terminalHeight, setTerminalHeight] = useState<number>(300);
+  const [showSidebar, setShowSidebar] = useState<boolean>(true);
+  const [showTerminal, setShowTerminal] = useState<boolean>(true);
   const [isFileSearchOpen, setIsFileSearchOpen] = useState<boolean>(false);
   const [isRecentProjectsOpen, setIsRecentProjectsOpen] = useState<boolean>(false);
   const [isCommitDialogOpen, setIsCommitDialogOpen] = useState<boolean>(false);
@@ -337,7 +339,6 @@ function App() {
       <TopBar
         projectName={currentProject.split('/').pop() || currentProject.split('\\').pop() || 'No Project'}
         gitBranch={gitBranch}
-        currentProject={currentProject}
         onOpenProject={openProject}
         onOpenRecentProjects={() => setIsRecentProjectsOpen(true)}
         onToggleTheme={toggleTheme}
@@ -345,53 +346,61 @@ function App() {
         onSaveFile={saveCurrentFile}
         onSaveProjectAs={saveProjectAs}
         hasUnsavedChanges={hasUnsavedChanges}
+        onToggleSidebar={() => setShowSidebar((s) => !s)}
+        onToggleTerminal={() => setShowTerminal((t) => !t)}
+        showSidebar={showSidebar}
+        showTerminal={showTerminal}
       />
 
       <div className="flex flex-1 overflow-hidden">
         {/* Sidebar */}
-        <div
-          className="border-r border-border bg-card"
-          style={{ width: sidebarWidth }}
-        >
-          <FileTree
-            fileTree={fileTree}
-            onFileClick={openFile}
-            currentProject={currentProject}
-            onRefresh={() => {
-              loadFileTree(currentProject);
-              if (currentProject) detectGitStatus(currentProject);
-            }}
-            onOpenCommitDialog={() => setIsCommitDialogOpen(true)}
-            onLoadSubdirectory={loadSubdirectory}
-            gitStatus={gitStatus}
-            showGitPanel={showGitPanel}
-            onGitPanelToggle={setShowGitPanel}
-          />
-        </div>
+        {showSidebar && (
+          <div
+            className="border-r border-border bg-card"
+            style={{ width: sidebarWidth }}
+          >
+            <FileTree
+              fileTree={fileTree}
+              onFileClick={openFile}
+              currentProject={currentProject}
+              onRefresh={() => {
+                loadFileTree(currentProject);
+                if (currentProject) detectGitStatus(currentProject);
+              }}
+              onOpenCommitDialog={() => setIsCommitDialogOpen(true)}
+              onLoadSubdirectory={loadSubdirectory}
+              gitStatus={gitStatus}
+              showGitPanel={showGitPanel}
+              onGitPanelToggle={setShowGitPanel}
+            />
+          </div>
+        )}
 
         {/* Resizer */}
-        <div
-          className="resizer w-1 bg-border hover:bg-accent cursor-col-resize"
-          onMouseDown={(e) => {
-            const startX = e.clientX;
-            const startWidth = sidebarWidth;
+        {showSidebar && (
+          <div
+            className="resizer w-1 bg-border hover:bg-accent cursor-col-resize"
+            onMouseDown={(e) => {
+              const startX = e.clientX;
+              const startWidth = sidebarWidth;
 
-            const handleMouseMove = (e: MouseEvent) => {
-              const newWidth = startWidth + (e.clientX - startX);
-              if (newWidth > 150 && newWidth < 500) {
-                setSidebarWidth(newWidth);
-              }
-            };
+              const handleMouseMove = (e: MouseEvent) => {
+                const newWidth = startWidth + (e.clientX - startX);
+                if (newWidth > 150 && newWidth < 500) {
+                  setSidebarWidth(newWidth);
+                }
+              };
 
-            const handleMouseUp = () => {
-              document.removeEventListener('mousemove', handleMouseMove);
-              document.removeEventListener('mouseup', handleMouseUp);
-            };
+              const handleMouseUp = () => {
+                document.removeEventListener('mousemove', handleMouseMove);
+                document.removeEventListener('mouseup', handleMouseUp);
+              };
 
-            document.addEventListener('mousemove', handleMouseMove);
-            document.addEventListener('mouseup', handleMouseUp);
-          }}
-        />
+              document.addEventListener('mousemove', handleMouseMove);
+              document.addEventListener('mouseup', handleMouseUp);
+            }}
+          />
+        )}
 
         {/* Main Content */}
         <div className="flex-1 flex flex-col">
@@ -405,36 +414,40 @@ function App() {
           />
 
           {/* Resizer */}
-          <div
-            className="resizer-horizontal h-1 bg-border hover:bg-accent cursor-row-resize"
-            onMouseDown={(e) => {
-              const startY = e.clientY;
-              const startHeight = terminalHeight;
+          {showTerminal && (
+            <div
+              className="resizer-horizontal h-1 bg-border hover:bg-accent cursor-row-resize"
+              onMouseDown={(e) => {
+                const startY = e.clientY;
+                const startHeight = terminalHeight;
 
-              const handleMouseMove = (e: MouseEvent) => {
-                const newHeight = startHeight - (e.clientY - startY);
-                if (newHeight > 150 && newHeight < 600) {
-                  setTerminalHeight(newHeight);
-                }
-              };
+                const handleMouseMove = (e: MouseEvent) => {
+                  const newHeight = startHeight - (e.clientY - startY);
+                  if (newHeight > 150 && newHeight < 600) {
+                    setTerminalHeight(newHeight);
+                  }
+                };
 
-              const handleMouseUp = () => {
-                document.removeEventListener('mousemove', handleMouseMove);
-                document.removeEventListener('mouseup', handleMouseUp);
-              };
+                const handleMouseUp = () => {
+                  document.removeEventListener('mousemove', handleMouseMove);
+                  document.removeEventListener('mouseup', handleMouseUp);
+                };
 
-              document.addEventListener('mousemove', handleMouseMove);
-              document.addEventListener('mouseup', handleMouseUp);
-            }}
-          />
+                document.addEventListener('mousemove', handleMouseMove);
+                document.addEventListener('mouseup', handleMouseUp);
+              }}
+            />
+          )}
 
           {/* Terminal */}
-          <div
-            className="border-t border-border bg-card"
-            style={{ height: terminalHeight }}
-          >
-            <Terminal currentProject={currentProject} />
-          </div>
+          {showTerminal && (
+            <div
+              className="border-t border-border bg-card"
+              style={{ height: terminalHeight }}
+            >
+              <Terminal currentProject={currentProject} />
+            </div>
+          )}
         </div>
       </div>
 

@@ -625,7 +625,7 @@ const FileTree: React.FC<FileTreeProps> = ({
                     compact={false}
                   />
                 </div>
-                <div className="border-t border-border" style={{ height: 320 }}>
+                <div className="border-t border-border" style={{ height: 300 }}>
                   <GitHistory currentProject={currentProject} gitBranch={currentGitStatus.branch} compact={false} refreshKey={historyRefreshKey} />
                 </div>
               </>

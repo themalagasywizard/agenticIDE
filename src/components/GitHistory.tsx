@@ -82,7 +82,7 @@ const GitHistory: React.FC<GitHistoryProps> = ({
       {!compact && (
         <div className="px-3 py-2 border-b border-border bg-muted/30">
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-foreground">Commits</h3>
+            <h3 className="text-sm font-semibold text-foreground">Git Tree</h3>
             <div className="flex items-center space-x-2">
               {gitBranch && (
                 <span className="text-xs bg-accent/50 px-2 py-1 rounded">
@@ -173,30 +173,6 @@ const GitHistory: React.FC<GitHistoryProps> = ({
         )}
       </div>
 
-      {/* Footer with branch actions - only in non-compact mode */}
-      {!compact && commits.length > 0 && (
-        <div className="p-3 border-t border-border bg-muted/30">
-          <div className="flex space-x-2">
-            <button
-              onClick={loadCommits}
-              className="flex-1 px-3 py-1 text-xs bg-accent hover:bg-accent/80 rounded"
-              title="Refresh commits"
-            >
-              🔄 Refresh
-            </button>
-            <button
-              className="flex-1 px-3 py-1 text-xs bg-accent hover:bg-accent/80 rounded"
-              title="View all commits"
-              onClick={() => {
-                // TODO: Open detailed commit view
-                console.log('View all commits clicked');
-              }}
-            >
-              📊 View All
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
